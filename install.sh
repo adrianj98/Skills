@@ -89,7 +89,10 @@ PY"
 fi
 
 # ---------- fetch sources ----------
-SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)/plugins/adversarial-review"
+# BASH_SOURCE is unset when this script is piped into bash, and `set -u` makes a bare
+# ${BASH_SOURCE[0]} noisy there. Default it, and fall back to the cwd.
+SELF="${BASH_SOURCE[0]:-}"
+SRC="$(cd "$(dirname "${SELF:-.}")" 2>/dev/null && pwd || pwd)/plugins/adversarial-review"
 TMP=""
 if [ ! -f "$SRC/agents/adversary.md" ]; then
   command -v curl >/dev/null 2>&1 || die "no local copy found and curl is unavailable"
