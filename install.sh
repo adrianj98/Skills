@@ -19,6 +19,29 @@ set -uo pipefail
 RAW="https://raw.githubusercontent.com/adrianj98/Skills/main/plugins/adversarial-review"
 SCOPE=""; DEST_ARG=""; UNINSTALL=0; NO_HOOK=0; DRY=0; SETTINGS_FILE="settings.json"
 
+usage() {
+cat <<'USAGE'
+Install adversarial review without the plugin system.
+
+  install.sh --global          into ~/.claude/            (every repo)
+  install.sh --repo            into ./.claude/            (this repo, committed)
+  install.sh --repo --local    into ./.claude/, hook in settings.local.json (gitignored)
+  install.sh --repo PATH       into PATH/.claude/
+  install.sh --uninstall --global | --repo [PATH]
+
+  --no-hook   skip the Stop-hook nudge (agent + skill + workflow only)
+  --dry-run   print what would happen, change nothing
+
+Installs: the adversary subagent, the /adversary toggle skill, the
+/adversarial-review workflow, an on/off switch, and (unless --no-hook) a Stop
+hook registered in your settings.json. Merges into existing settings rather
+than overwriting; re-running is idempotent.
+
+From a clone:  ./install.sh --global
+Standalone:    curl -fsSL https://raw.githubusercontent.com/adrianj98/Skills/main/install.sh | bash -s -- --global
+USAGE
+}
+
 die()  { printf 'error: %s\n' "$*" >&2; exit 1; }
 say()  { printf '%s\n' "$*"; }
 run()  { if [ "$DRY" = 1 ]; then printf '  [dry-run] %s\n' "$*"; else eval "$@"; fi; }
@@ -31,12 +54,12 @@ while [ $# -gt 0 ]; do
     --uninstall) UNINSTALL=1 ;;
     --no-hook)   NO_HOOK=1 ;;
     --dry-run)   DRY=1 ;;
-    -h|--help)   awk 'NR>1 && /^#/ {sub(/^# ?/,""); print; next} NR>1 {exit}' "$0"; exit 0 ;;
+    -h|--help)   usage; exit 0 ;;
     *)           die "unknown option: $1 (try --help)" ;;
   esac
   shift
 done
-[ -n "$SCOPE" ] || die "pick a scope: --global or --repo [PATH]  (see --help)"
+if [ -z "$SCOPE" ]; then usage >&2; die "pick a scope: --global or --repo [PATH]"; fi
 
 # ---------- destination ----------
 if [ "$SCOPE" = global ]; then
