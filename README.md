@@ -19,6 +19,16 @@ per implementer. The implementer doesn't review. The reviewer doesn't implement.
 claude plugin install adversarial-review@adrianj98-skills
 ```
 
+Or without the plugin system — copies the files into `~/.claude/` or a repo's `.claude/`,
+merges the hook into your existing `settings.json`, and is reversible:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/adrianj98/Skills/main/install.sh | bash -s -- --global
+```
+
+See [`install.sh --help`](install.sh) for `--repo`, `--local`, `--no-hook`, `--dry-run`,
+and `--uninstall`.
+
 Ships four levels of the same idea, escalating by how hard it is to skip:
 
 | | invoke | |

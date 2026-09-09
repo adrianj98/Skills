@@ -11,6 +11,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 for CANDIDATE in \
   "${CLAUDE_PLUGIN_ROOT:-}/bin/adversary" \
   "$HERE/../bin/adversary" \
+  "$HERE/adversary" \
   "$HERE/adversary.sh" \
   "$(command -v adversary 2>/dev/null || true)"
 do
