@@ -1,0 +1,23 @@
+{
+  "$schema": "https://code.claude.com/schemas/marketplace.json",
+  "name": "adrianj98-skills",
+  "owner": {
+    "name": "Adrian Jones",
+    "url": "https://github.com/adrianj98"
+  },
+  "description": "Claude Code plugins and skills by adrianj98",
+  "plugins": [
+    {
+      "name": "adversarial-review",
+      "displayName": "Adversarial Review",
+      "source": "./plugins/adversarial-review",
+      "description": "A reviewer that assumes your code is wrong, in a context window that never saw you write it. Split-context review modelled on Bun's Zig-to-Rust rewrite.",
+      "version": "0.1.0",
+      "author": { "name": "Adrian Jones", "url": "https://github.com/adrianj98" },
+      "repository": "https://github.com/adrianj98/skills",
+      "license": "MIT",
+      "keywords": ["code-review", "adversarial", "subagents", "workflow", "hooks", "quality"],
+      "category": "development"
+    }
+  ]
+}

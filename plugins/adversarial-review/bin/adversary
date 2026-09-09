@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+# Toggle and inspect adversarial review.
+#
+#   adversary on|off        this repo (falls back to global if not in a repo)
+#   adversary on|off --all  globally, every repo
+#   adversary clear         drop this repo's override, inherit global
+#   adversary status        what's active and why
+#
+# Precedence: env var > repo override > global > default (on)
+set -uo pipefail
+
+GLOBAL="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/adversary-review"
+REPO=""
+if git rev-parse --git-dir >/dev/null 2>&1; then
+  REPO="$(git rev-parse --git-dir)/adversary-review"
+fi
+
+resolve() {
+  if [ -n "${ADVERSARY_REVIEW:-}" ]; then
+    case "$ADVERSARY_REVIEW" in
+      0|off|false) echo "off env"; return ;;
+      *)           echo "on env";  return ;;
+    esac
+  fi
+  if [ -n "$REPO" ] && [ -f "$REPO" ]; then
+    echo "$(tr -d '[:space:]' < "$REPO") repo"; return
+  fi
+  if [ -f "$GLOBAL" ]; then
+    echo "$(tr -d '[:space:]' < "$GLOBAL") global"; return
+  fi
+  echo "on default"
+}
+
+write() { # write <on|off> <scope>
+  if [ "$2" = "--all" ]; then
+    mkdir -p "$(dirname "$GLOBAL")"; printf '%s\n' "$1" > "$GLOBAL"
+    echo "adversarial review: $1 (globally)"
+  elif [ -n "$REPO" ]; then
+    printf '%s\n' "$1" > "$REPO"
+    echo "adversarial review: $1 (this repo — $(basename "$(git rev-parse --show-toplevel)"))"
+  else
+    mkdir -p "$(dirname "$GLOBAL")"; printf '%s\n' "$1" > "$GLOBAL"
+    echo "adversarial review: $1 (globally — not inside a git repo)"
+  fi
+}
+
+case "${1:-status}" in
+  on|off)
+    write "$1" "${2:-}"
+    ;;
+  clear)
+    [ -n "$REPO" ] && rm -f "$REPO"
+    echo "repo override cleared — now: $(resolve | cut -d' ' -f1)"
+    ;;
+  status)
+    read -r state src <<< "$(resolve)"
+    echo "adversarial review: $state  (from: $src)"
+    [ -n "$REPO" ] && [ -f "$REPO" ]   && echo "  repo override:   $REPO"
+    [ -f "$GLOBAL" ]                   && echo "  global setting:  $GLOBAL"
+    [ -n "${ADVERSARY_REVIEW:-}" ]     && echo "  env override:    ADVERSARY_REVIEW=$ADVERSARY_REVIEW"
+    exit 0   # the optional lines above must not become this command's exit status
+    ;;
+  is-on)  # for scripts: exit 0 if on
+    [ "$(resolve | cut -d' ' -f1)" = "on" ]
+    ;;
+  *)
+    echo "usage: adversary [on|off [--all]|clear|status]" >&2
+    exit 1
+    ;;
+esac

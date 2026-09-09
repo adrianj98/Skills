@@ -1,0 +1,10 @@
+{
+  "name": "adversarial-review",
+  "displayName": "Adversarial Review",
+  "version": "0.1.0",
+  "description": "One agent writes, a separate agent with its own context window tries to prove it broken. Ships a read-only reviewer subagent, a multi-lens review workflow with a refutation pass, and an opt-out Stop-hook nudge.",
+  "author": { "name": "Adrian Jones", "url": "https://github.com/adrianj98" },
+  "repository": "https://github.com/adrianj98/skills",
+  "license": "MIT",
+  "keywords": ["code-review", "adversarial", "subagents", "workflow", "hooks"]
+}
