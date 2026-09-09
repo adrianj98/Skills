@@ -1,0 +1,56 @@
+name: Adversarial review
+
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review]
+
+jobs:
+  adversary:
+    # Off switches: add the `skip-adversary` label to a PR, or set the repo
+    # variable ADVERSARY_REVIEW to "off" (Settings → Secrets and variables → Actions).
+    if: >-
+      !github.event.pull_request.draft &&
+      !contains(github.event.pull_request.labels.*.name, 'skip-adversary') &&
+      vars.ADVERSARY_REVIEW != 'off'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            Adversarially review this pull request. Assume the code is wrong and find why.
+
+            The diff is: git diff origin/${{ github.base_ref }}...HEAD
+
+            Spawn FOUR adversary subagents in parallel (Task tool, subagent_type: adversary),
+            one per lens. Each gets the diff and its lens only:
+
+              1. correctness      — evaluation order, boundaries, off-by-one, sign/overflow,
+                                    empty/null/zero cases
+              2. failure-paths    — error branches, cleanup, early returns, partial failure,
+                                    swallowed or defaulted errors
+              3. lifetime-async   — ownership and lifetime, use-after-close, races, unawaited
+                                    work, cancellation, retries duplicating side effects
+              4. contract-drift   — changed types, nullability, return shapes and thrown errors
+                                    that callers OUTSIDE this diff still expect the old version of
+
+            Then, for every finding they return, spawn 3 refuters in parallel. A refuter's job
+            is to KILL the finding: default to refuted unless it can confirm the failure is real,
+            reachable, and caused by this diff. A finding survives only with 2 of 3 non-refuting
+            votes.
+
+            Post only survivors as inline comments. Each comment: what breaks, and the concrete
+            inputs or state that make it break. No style notes, no naming, no "consider adding".
+
+            If nothing survives, post one summary comment stating what was attacked and why it held.
+          claude_args: >-
+            --allowedTools "Read,Grep,Glob,Bash(git:*),Bash(gh pr view:*),mcp__github_inline_comment__create_inline_comment"
+            --max-turns 60
