@@ -1,0 +1,31 @@
+# What ../../install.sh copies when someone installs this plugin without the plugin system.
+#
+#   name  <title>                       shown while installing
+#   about <one line>                    shown by install.sh --list
+#   file  <src> <dest> <description>    copy into <install root>/<dest>
+#   bin   <src> <dest> <description>    same, plus the exec bit
+#   hook  <Event> <src> <dest> <desc>   same, and register it under hooks.<Event>
+#   rewrite <from> <to>                 applied to every installed file; @ROOT@ = install root
+#   tip   <line>                        printed at the end of a successful install
+#   note  <line>                        printed at the end of an uninstall
+
+name   Adversarial Review
+about  A reviewer that assumes your code is wrong, in a context window that never saw you write it.
+
+file   agents/adversary.md        agents/adversary.md              the reviewer
+file   workflows/review.js        workflows/adversarial-review.js  /adversarial-review
+file   skills/adversary/SKILL.md  skills/adversary/SKILL.md        /adversary  (on, off, status, clear, run)
+bin    bin/adversary              hooks/adversary                  the on/off switch
+hook   Stop  scripts/require-adversary.sh  hooks/require-adversary.sh  the Stop-hook nudge
+
+# Outside the plugin system there is no ${CLAUDE_PLUGIN_ROOT} and no /plugin:skill namespace.
+rewrite  ${CLAUDE_PLUGIN_ROOT}/bin/adversary  @ROOT@/hooks/adversary
+rewrite  /adversarial-review:adversary        /adversary
+rewrite  /adversarial-review:review           /adversarial-review
+
+tip  /adversary status                       is it on, and why
+tip  /adversary run                          review the current diff now
+tip  /adversarial-review                     the full workflow, with refutation voting
+tip  bash "@ROOT@/hooks/adversary" off       silence the nudge in this repo
+
+note  your on/off state (.git/adversary-review, $CLAUDE_CONFIG_DIR/adversary-review) was left alone

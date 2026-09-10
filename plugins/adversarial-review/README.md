@@ -106,23 +106,25 @@ repo's `.claude/` — no marketplace, no plugin manager.
 
 ```bash
 # every repo on this machine
-curl -fsSL https://raw.githubusercontent.com/adrianj98/Skills/main/install.sh | bash -s -- --global
+curl -fsSL https://raw.githubusercontent.com/adrianj98/Skills/main/install.sh \
+  | bash -s -- adversarial-review --global
 
 # just this repo, committed so teammates get it on clone
-./install.sh --repo
+./install.sh adversarial-review --local
 
-# just this repo, but keep it out of git
-./install.sh --repo --local
+# just this repo, but keep the hook out of git
+./install.sh adversarial-review --local --private
 ```
 
 It merges into any `settings.json` you already have rather than overwriting it, skips the
 hook entirely with `--no-hook`, shows you the plan with `--dry-run`, and reverses cleanly
-with `--uninstall --global` / `--uninstall --repo`. Repo installs bake
+with `--uninstall --global` / `--uninstall --local`. Local installs bake
 `$CLAUDE_PROJECT_DIR` into the paths instead of absolute ones, so a committed `.claude/`
 works from anyone's checkout.
 
 The names differ slightly from the plugin install, since nothing is namespaced:
-`/adversary` for the toggle, `/adversarial-review` for the workflow.
+`/adversary` for the toggle, `/adversarial-review` for the workflow. What gets copied where
+is [`install.manifest`](install.manifest) — `install.sh` itself is generic.
 
 ## What you get
 

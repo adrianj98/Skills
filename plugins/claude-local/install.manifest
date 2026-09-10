@@ -1,0 +1,17 @@
+# What ../../install.sh copies when someone installs this plugin without the plugin system.
+# See ../adversarial-review/install.manifest for the verb reference.
+
+name   CLAUDE.local.md
+about  A personal, uncommitted CLAUDE.local.md — per repo, or globally for every repo.
+
+file   skills/claude-local/SKILL.md  skills/claude-local/SKILL.md  /claude-local  (init, link, status)
+bin    bin/claude-local              bin/claude-local              creates and edits the file
+
+rewrite  ${CLAUDE_PLUGIN_ROOT}/bin/claude-local  @ROOT@/bin/claude-local
+rewrite  /claude-local:claude-local              /claude-local
+
+tip  /claude-local init            this repo, git-excluded
+tip  /claude-local init --global   every repo
+tip  /claude-local link            import it from CLAUDE.md so it loads
+
+note  your CLAUDE.local.md files were left alone

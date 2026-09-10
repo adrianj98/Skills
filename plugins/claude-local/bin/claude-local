@@ -1,0 +1,108 @@
+#!/usr/bin/env bash
+# Create and manage a personal, uncommitted CLAUDE.local.md.
+#
+#   claude-local init [--global]    create it (repo root, or ~/.claude for every repo)
+#   claude-local link [--global]    import it from the neighbouring CLAUDE.md, so it loads
+#   claude-local path [--global]    print the path
+#   claude-local status             what exists, where, and whether it is loaded
+#
+# Repo scope writes <repo root>/CLAUDE.local.md and excludes it through .git/info/exclude,
+# so it stays yours: no change to the tracked .gitignore, nothing to commit by accident.
+set -uo pipefail
+
+GLOBAL_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
+REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+
+scope_dir() { # scope_dir <--global|"">
+  if [ "${1:-}" = "--global" ]; then
+    printf '%s' "$GLOBAL_DIR"
+  elif [ -n "$REPO_ROOT" ]; then
+    printf '%s' "$REPO_ROOT"
+  else
+    printf '%s' "$PWD"
+  fi
+}
+
+template() {
+cat <<'TPL'
+# CLAUDE.local.md
+
+Personal notes for Claude Code. Not committed — yours alone.
+
+## How I like to work
+
+-
+
+## Things about this project Claude can't infer
+
+-
+
+## Commands I reach for
+
+```bash
+
+```
+TPL
+}
+
+ensure_ignored() { # ensure_ignored <file>   — repo scope only
+  [ -n "$REPO_ROOT" ] || return 0
+  local rel="${1#$REPO_ROOT/}"
+  git -C "$REPO_ROOT" check-ignore -q "$rel" 2>/dev/null && { echo "  already git-ignored"; return 0; }
+  local ex; ex="$(git -C "$REPO_ROOT" rev-parse --git-dir)/info/exclude"
+  mkdir -p "$(dirname "$ex")"
+  printf '%s\n' "$rel" >> "$ex"
+  echo "  excluded via ${ex#$REPO_ROOT/} (not the tracked .gitignore)"
+}
+
+do_init() {
+  local dir file; dir="$(scope_dir "${1:-}")"; file="$dir/CLAUDE.local.md"
+  mkdir -p "$dir"
+  if [ -f "$file" ]; then
+    echo "already there: $file"
+  else
+    template > "$file"
+    echo "created: $file"
+  fi
+  [ "${1:-}" = "--global" ] || ensure_ignored "$file"
+  if ! grep -q '@CLAUDE\.local\.md' "$dir/CLAUDE.md" 2>/dev/null; then
+    echo "  not imported yet — \`claude-local link${1:+ $1}\` adds @CLAUDE.local.md to $dir/CLAUDE.md"
+  fi
+}
+
+do_link() {
+  local dir md; dir="$(scope_dir "${1:-}")"; md="$dir/CLAUDE.md"
+  if grep -q '@CLAUDE\.local\.md' "$md" 2>/dev/null; then
+    echo "already imported by $md"; return 0
+  fi
+  mkdir -p "$dir"
+  [ -s "$md" ] && printf '\n' >> "$md"
+  printf '%s\n' '@CLAUDE.local.md' >> "$md"
+  echo "imported: $md now pulls in CLAUDE.local.md"
+  [ "${1:-}" = "--global" ] || echo "  note: $md is usually tracked — that one line will show up in git status"
+}
+
+report() { # report <label> <dir>
+  local file="$2/CLAUDE.local.md"
+  if [ -f "$file" ]; then
+    printf '  %-8s %s  (%s lines)\n' "$1" "$file" "$(wc -l < "$file" | tr -d ' ')"
+    grep -q '@CLAUDE\.local\.md' "$2/CLAUDE.md" 2>/dev/null \
+      && echo "           imported by $2/CLAUDE.md" \
+      || echo "           not imported by $2/CLAUDE.md — run: claude-local link"
+  else
+    printf '  %-8s none  (%s)\n' "$1" "$file"
+  fi
+}
+
+case "${1:-status}" in
+  init)   do_init "${2:-}" ;;
+  link)   do_link "${2:-}" ;;
+  path)   printf '%s/CLAUDE.local.md\n' "$(scope_dir "${2:-}")" ;;
+  status)
+    echo "CLAUDE.local.md:"
+    [ -n "$REPO_ROOT" ] && report "repo" "$REPO_ROOT" || echo "  repo     (not inside a git repo)"
+    report "global" "$GLOBAL_DIR"
+    exit 0   # the conditional lines above must not become this command's exit status
+    ;;
+  *) echo "usage: claude-local [init|link|path] [--global] | status" >&2; exit 1 ;;
+esac
