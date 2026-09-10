@@ -115,6 +115,11 @@ const attackPrompt = (unit, lens) =>
     'Your lens for this pass is ' + lens.key + '. Concentrate on: ' + lens.focus,
     'Other reviewers cover the other lenses — do not spread yourself thin.',
     '',
+    'Your 10-turn ceiling still applies — depth here comes from many agents, not long ones.',
+    'You have one file and one lens, which is what that budget is sized for. Two exceptions to',
+    'your standing instructions: report every finding you can justify (not just your top 3), and',
+    'fill in `tried` below even when you found nothing.',
+    '',
     'Rules: no style, no naming, no "consider adding", no hypothetical refactors.',
     'Every finding needs concrete inputs or state and the resulting wrong behavior.',
     'If the code needs a paragraph-long comment to justify a workaround, the code is wrong — that is a finding.',
@@ -142,6 +147,11 @@ const refutePrompt = (f, unit, i) =>
     'Set refuted=true if the claim is wrong, already handled elsewhere, unreachable, a style opinion,',
     'or describes pre-existing behavior this diff did not change.',
     'Set refuted=false only if the failure is real and this diff causes it.',
+    '',
+    'Budget: you are one vote of ' + REFUTERS + ' on one claim, so keep it to a handful of tool calls and',
+    'batch independent ones into a single turn. If your angle needs more than that to settle, vote',
+    'refuted=true and say what you could not check — an unsettled claim is exactly what a refuter',
+    'is meant to catch.',
   ].join('\n')
 
 const perFile = await pipeline(

@@ -149,10 +149,32 @@ modify code — not "instructed not to", the tools aren't in its hands. That's *
 reviewer doesn't implement"* enforced structurally, so it can't drift into fixing things
 and start defending its own fix.
 
-The body carries the behavior: assume the code is wrong, burden of proof is on the diff,
-every finding needs a concrete failure scenario, no style notes, plus a checklist of where
-bugs actually hide in generated code. It ends with the anti-rubber-stamp rule — if you
-found nothing, say what you tried to break and why it held. "LGTM" is not a valid output.
+The body carries the behavior: find concrete reasons the diff breaks, every finding needs a
+concrete failure scenario, no style notes, plus a list of where bugs actually hide in
+generated code — skimmed against the diff, not worked through end to end.
+
+### The turn ceiling
+
+`maxTurns: 10`, in the frontmatter. Same trick as `disallowedTools`: a structural limit,
+not a request the agent can reason its way past.
+
+This is the setting that decides whether you keep the plugin. Reviewer agents don't get
+slow by finding too much — they get slow by *looking*. One agent opens the diff, then a
+caller, then the caller's caller, then greps the repo for a type, then runs the suite, and
+forty turns later it reports the same two findings it had by turn six. Multiply by four
+lenses and you've lost an hour at the end of every turn. Parallelism doesn't save you here;
+the lenses run concurrently, so the slowest single agent *is* the wall-clock cost.
+
+So the prompt spends the budget explicitly: turn 1 reads the diff, turns 2–7 are at most
+two batched rounds of follow-up reads, by turn 8 stop reading and write. Anything unchecked
+ships as `plausible` — an unverified finding the reader can check in thirty seconds beats
+four turns spent verifying it. Walking the call tree, repo-wide greps, running the suite,
+and building a repro harness are all named as out of scope, and "nothing found" is a
+legitimate two-line answer rather than something it has to justify.
+
+The ceiling is hard, and hitting it returns *nothing* — so the prompt has to make it land
+before the cliff, not just aim vaguely at brevity. The deep workflow keeps the same ceiling
+and buys depth by adding agents instead of lengthening them.
 
 **Cheapest form**, one agent, one pass:
 
@@ -200,6 +222,20 @@ state tells Claude to hand the diff to the `adversary` subagent instead of revie
 own work. It writes the marker *before* blocking, so it fires at most once per distinct
 diff and can't loop — which also makes it a nudge rather than a wall. Deliberate. The wall
 is CI.
+
+A nudge you hit automatically has to be cheap, or you start turning it off. Two things keep
+it that way. The lenses run **in parallel**, so four of them cost about one agent's
+wall-clock. And each reviewer is capped at **10 turns** (see below), so a lens can't wander
+off into the codebase for twenty minutes. Four capped agents at once is a short round; four
+uncapped ones sequentially is the afternoon you stopped using this.
+
+It also stays quiet on changes that don't earn it: docs and licence files are never
+counted, and a diff under 25 changed code lines is skipped entirely. Move that line with
+`ADVERSARY_MIN_LINES` (`0` reviews everything):
+
+```bash
+ADVERSARY_MIN_LINES=100 claude    # only sizeable diffs
+```
 
 ### `bin/adversary` — the off switch
 
@@ -255,7 +291,7 @@ repo secrets; `claude /install-github-app` does both.
 |---|---|---|---|
 | subagent alone | ~1 agent | you ask | yes, trivially |
 | workflow | ~76 agents on a 10-file diff | you ask | yes, trivially |
-| Stop hook | ~4 agents | automatically, once per diff | yes, one command |
+| Stop hook | ~4 agents, capped at 10 turns each | automatically, once per diff ≥25 code lines | yes, one command |
 | GitHub Action | ~50+ agents | every PR | not from your laptop |
 
 Same reviewer underneath all four. The escalation is purely about how hard it is to not
@@ -268,10 +304,9 @@ run it.
 | separate context window | `Task`/`agent()` subagent | it never saw your reasoning, so it can't inherit your assumptions |
 | "the reviewer doesn't implement" | `disallowedTools: Write, Edit` | structural, not a prompt it can talk itself out of |
 | "its context: only the diff" | reviewer starts from `git diff` | reviewing the file invites judging intent; reviewing the diff invites finding breakage |
-| "assume the code is wrong" | the agent's first instruction | "review this" gets you an approval; "find why this breaks" gets you findings |
+| "assume the code is wrong" | the agent's framing: *find reasons this breaks* | "review this" gets you an approval; "find why this breaks" gets you findings |
 | 2+ reviewers per implementer | 4 lenses in parallel | one reviewer covering everything covers nothing; each lens is told to ignore the others' territory |
 | "1 fixes / 2 review / 1 applies" | findings return as data; you or the author agent apply | the reviewer proposing the fix re-merges the roles |
-| paragraph-long-comment rule | in the agent prompt | catches the rationalized workaround |
 
 ### The one thing I added
 

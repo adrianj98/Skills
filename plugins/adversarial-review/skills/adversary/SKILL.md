@@ -19,9 +19,10 @@ directly, since the file may not carry an exec bit after install.
 - **`status`**, or no argument — the state is already shown above. Report it in one line and
   say what would change it. Run nothing else.
 - **`run`** — ignore the toggle and review the current diff now. Spawn four subagents in
-  parallel (Task tool, `subagent_type: adversary`), one per lens — correctness,
-  failure-paths, lifetime-and-async, contract-drift — each starting from `git diff HEAD` and
-  told to assume the code is wrong. Report their findings. Fix nothing unless asked.
+  one message so they run in parallel (Task tool, `subagent_type: adversary`), one per lens
+  — correctness, failure-paths, lifetime-and-async, contract-drift — each starting from
+  `git diff HEAD`. Each is capped at 10 turns, so this is one short round; let them finish
+  and report, don't chase their findings further yourself. Fix nothing unless asked.
   For a heavier pass with refutation voting, use `/adversarial-review:review` instead.
 - **anything else** — show the usage line and the current state.
 
