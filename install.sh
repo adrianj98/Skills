@@ -13,7 +13,8 @@
 #     | bash -s -- adversarial-review --global
 #
 # What each plugin installs is described by its own plugins/<name>/install.manifest,
-# so this script stays generic: it never mentions a specific plugin.
+# so this script stays generic: it never mentions a specific plugin. Not everything
+# installable is a plugin — a manifest can also just seed a file (see the `personal` verb).
 set -uo pipefail
 
 # Override to install from a fork or a branch: SKILLS_RAW=https://raw.githubusercontent.com/you/Skills/dev
@@ -92,7 +93,13 @@ available() { # one plugin name per line
       [ -f "$d/install.manifest" ] && basename "$d"
     done
   else
-    local m; m="$TMP/marketplace.json"
+    # plugins/index lists everything install.sh can install, which is a superset of the
+    # marketplace: some entries (CLAUDE.local.md) are just files, not plugins.
+    local i m; i="$TMP/index"
+    if [ -f "$i" ] || fetch "$REPO_RAW/plugins/index" "$i" 2>/dev/null; then
+      grep '[^[:space:]]' "$i"; return 0
+    fi
+    m="$TMP/marketplace.json"
     [ -f "$m" ] || fetch "$REPO_RAW/.claude-plugin/marketplace.json" "$m" || return 1
     sed -n 's|.*"source"[[:space:]]*:[[:space:]]*"\./plugins/\([^"]*\)".*|\1|p' "$m"
   fi
@@ -103,7 +110,7 @@ manifest_field() { # manifest_field <file> <key>  — first `key value...` line
 }
 
 if [ "$LIST" = 1 ]; then
-  say "Installable plugins:"
+  say "Installable:"
   found=0
   while IFS= read -r p; do
     [ -n "$p" ] || continue
@@ -140,17 +147,20 @@ if [ -z "$SCOPE" ]; then usage >&2; die "pick a scope: --global or --local [PATH
 
 # ---------- destination ----------
 if [ "$SCOPE" = global ]; then
-  ROOT="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
+  BASE="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
+  ROOT="$BASE"
   LABEL="globally ($ROOT)"
-  # Path token baked into settings.json and into the installed files. Absolute paths break
+  # Path tokens baked into settings.json and into the installed files. Absolute paths break
   # the moment a teammate clones the repo elsewhere, so use the env vars Claude exports.
-  REF_ROOT='${CLAUDE_CONFIG_DIR:-$HOME/.claude}'
+  REF_BASE='${CLAUDE_CONFIG_DIR:-$HOME/.claude}'
+  REF_ROOT="$REF_BASE"
 else
   BASE="${DEST_ARG:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
   [ -d "$BASE" ] || die "not a directory: $BASE"
   ROOT="$BASE/.claude"
   LABEL="in $BASE"
-  REF_ROOT='$CLAUDE_PROJECT_DIR/.claude'
+  REF_BASE='$CLAUDE_PROJECT_DIR'
+  REF_ROOT="$REF_BASE/.claude"
 fi
 SETTINGS="$ROOT/$SETTINGS_FILE"
 
@@ -168,19 +178,21 @@ MANIFEST="$SRC/install.manifest"
 PLUGIN_NAME="$(manifest_field "$MANIFEST" name)"; PLUGIN_NAME="${PLUGIN_NAME:-$PLUGIN}"
 
 body() { grep -v '^[[:space:]]*#' "$MANIFEST" | grep -v '^[[:space:]]*$'; }
-# file/bin <src> <dest> <description...>   |   hook <Event> <src> <dest> <description...>
+# file/bin/personal <src> <dest> <desc...>  |  hook <Event> <src> <dest> <desc...>
 payload() { body | awk '
   function rest(n,  s,i) { s=""; for (i=n;i<=NF;i++) s = s (i>n ? " " : "") $i; return s }
-  $1=="file"||$1=="bin" { print $1"\t"$2"\t"$3"\t"rest(4) }
+  $1=="file"||$1=="bin"||$1=="personal" { print $1"\t"$2"\t"$3"\t"rest(4) }
   $1=="hook"            { print "hook:"$2"\t"$3"\t"$4"\t"rest(5) }'; }
 
-expand_ref() { printf '%s' "${1//@ROOT@/$REF_ROOT}"; }
+expand_ref() { local t="${1//@ROOT@/$REF_ROOT}"; printf '%s' "${t//@BASE@/$REF_BASE}"; }
 
 # ---------- uninstall ----------
 if [ "$UNINSTALL" = 1 ]; then
   say "Removing $PLUGIN_NAME $LABEL"
   while IFS="$(printf '\t')" read -r kind src dest desc; do
     [ -n "$dest" ] || continue
+    # `personal` files are the user's own writing by the time they are installed.
+    [ "$kind" = personal ] && continue
     f="$ROOT/$dest"
     [ -e "$f" ] && { run "rm -f '$f'"; say "  removed $dest"; }
     # Prune directories the install created, innermost first, only while empty.
@@ -240,6 +252,23 @@ done <<EOL
 $(body)
 EOL
 
+PAD="                                  "   # lines up with the %-32s columns above
+
+# A personal file that lands in a git work tree should not show up in git status. Use
+# .git/info/exclude rather than the tracked .gitignore, so nobody else's repo is touched.
+exclude_from_git() {
+  local dir top rel ex
+  dir="$(dirname "$1")"
+  top="$(git -C "$dir" rev-parse --show-toplevel 2>/dev/null)" || return 0
+  [ -n "$top" ] || return 0
+  rel="${1#$top/}"
+  git -C "$top" check-ignore -q "$rel" 2>/dev/null && { say "$PAD already git-ignored"; return 0; }
+  # --absolute-git-dir, because plain --git-dir answers relative to the repo, not to us.
+  ex="$(git -C "$top" rev-parse --absolute-git-dir)/info/exclude"
+  run "mkdir -p '$(dirname "$ex")' && printf '%s\n' '$rel' >> '$ex'"
+  say "$PAD git-excluded via .git/info/exclude"
+}
+
 # ---------- install ----------
 say "Installing $PLUGIN_NAME $LABEL"
 HOOK_CMDS=""
@@ -247,6 +276,19 @@ while IFS="$(printf '\t')" read -r kind src dest desc; do
   [ -n "$dest" ] || continue
   case "$kind" in
     hook:*) [ "$NO_HOOK" = 1 ] && { say "  (skipped $dest: --no-hook)"; continue; } ;;
+    personal)
+      # Not a config file: it goes next to the repo, it is the user's to edit, and an
+      # existing one is never overwritten.
+      target="$BASE/$dest"
+      if [ -e "$target" ]; then
+        printf '  %-32s %s\n' "$dest" "kept the one you already have"
+      else
+        run "mkdir -p '$(dirname "$target")'"
+        run "sed -f '$SEDSCRIPT' '$SRC/$src' > '$target'"
+        printf '  %-32s %s\n' "$dest" "$desc"
+        exclude_from_git "$target"
+      fi
+      continue ;;
   esac
   run "mkdir -p '$ROOT/$(dirname "$dest")'"
   run "sed -f '$SEDSCRIPT' '$SRC/$src' > '$ROOT/$dest'"
@@ -299,5 +341,5 @@ fi
 say ""
 say "Done. Try it:"
 body | sed -n 's/^tip[[:space:]]\{1,\}//p' | while IFS= read -r t; do say "  $(expand_ref "$t")"; done
-[ "$SCOPE" = repo ] && { say ""; say "Committed at $ROOT — teammates get it on clone."; }
+[ "$SCOPE" = repo ] && [ -d "$ROOT" ] && { say ""; say "Committed at $ROOT — teammates get it on clone."; }
 exit 0

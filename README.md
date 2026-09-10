@@ -32,18 +32,6 @@ Ships four levels of the same idea, escalating by how hard it is to skip:
 
 [Full README →](plugins/adversarial-review/README.md)
 
-### [`claude-local`](plugins/claude-local) · v0.1.0
-
-A personal `CLAUDE.local.md` — instructions Claude reads every session, that nobody else
-sees. `/claude-local init` for this repo (kept out of git via `.git/info/exclude`),
-`--global` for every repo, and `/claude-local <a note>` to file something into it.
-
-```bash
-claude plugin install claude-local@adrianj98-skills
-```
-
-[Full README →](plugins/claude-local/README.md)
-
 ## Installing without the plugin system
 
 `install.sh` copies a plugin's files into `~/.claude/` or a repo's `.claude/`, rewrites its
@@ -63,6 +51,17 @@ curl -fsSL https://raw.githubusercontent.com/adrianj98/Skills/main/install.sh \
 ./install.sh adversarial-review --uninstall --global  reverse it
 ```
 
+Not everything installable is a plugin. [`claude-local`](plugins/claude-local) is just a
+starter `CLAUDE.local.md` — personal notes for Claude, uncommitted:
+
+```bash
+./install.sh claude-local --local     # <repo root>/CLAUDE.local.md, kept out of git
+./install.sh claude-local --global    # ~/.claude/CLAUDE.local.md, applies everywhere
+```
+
+It lands beside the repo rather than in `.claude/`, adds itself to `.git/info/exclude`
+rather than the tracked `.gitignore`, and is never overwritten or deleted once it's yours.
+
 | | |
 |---|---|
 | `--global` | into `~/.claude/` (or `$CLAUDE_CONFIG_DIR`) |
@@ -81,21 +80,26 @@ Re-running is idempotent. `SKILLS_RAW=…` points the standalone install at a fo
    `workflows/*.js`, `hooks/hooks.json`, `bin/`, `.mcp.json`
 3. Add an entry to [`.claude-plugin/marketplace.json`](.claude-plugin/marketplace.json)
 4. `claude plugin validate .`
-5. Optional: a `plugins/<name>/install.manifest` so `install.sh <name>` works too.
-   `install.sh` knows nothing about any particular plugin — the manifest lists what to copy
-   where, which hooks to register, and which plugin-relative paths to rewrite:
+5. Optional: a `plugins/<name>/install.manifest`, plus the name in
+   [`plugins/index`](plugins/index), so `install.sh <name>` works too. `install.sh` knows
+   nothing about any particular plugin — the manifest lists what to copy where, which
+   hooks to register, and which plugin-relative paths to rewrite:
 
    ```
-   name   CLAUDE.local.md
-   about  A personal, uncommitted CLAUDE.local.md.
+   name   Some Plugin
+   about  One line, shown by install.sh --list.
 
-   file   skills/x/SKILL.md  skills/x/SKILL.md   /x
-   bin    bin/x              bin/x               the helper
-   hook   Stop  scripts/x.sh  hooks/x.sh         the nudge
+   file      skills/x/SKILL.md  skills/x/SKILL.md   /x
+   bin       bin/x              bin/x               the helper
+   hook      Stop  scripts/x.sh  hooks/x.sh         the nudge
+   personal  NOTES.md           NOTES.md            beside the repo, never clobbered
 
    rewrite  ${CLAUDE_PLUGIN_ROOT}/bin/x  @ROOT@/bin/x
-   tip      /x init
+   tip      /x — try this first
    ```
+
+   `@ROOT@` is the `.claude/` directory, `@BASE@` the repo root (or the config dir when
+   installing globally).
 
 ## License
 

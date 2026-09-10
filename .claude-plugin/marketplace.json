@@ -18,18 +18,6 @@
       "license": "MIT",
       "keywords": ["code-review", "adversarial", "subagents", "workflow", "hooks", "quality"],
       "category": "development"
-    },
-    {
-      "name": "claude-local",
-      "displayName": "CLAUDE.local.md",
-      "source": "./plugins/claude-local",
-      "description": "A personal, uncommitted CLAUDE.local.md — per repo or globally for every repo. Creates it, keeps it out of git, imports it from CLAUDE.md, and edits it from a session.",
-      "version": "0.1.0",
-      "author": { "name": "Adrian Jones", "url": "https://github.com/adrianj98" },
-      "repository": "https://github.com/adrianj98/skills",
-      "license": "MIT",
-      "keywords": ["memory", "instructions", "claude-md", "local", "configuration"],
-      "category": "development"
     }
   ]
 }

@@ -1,17 +1,12 @@
-# What ../../install.sh copies when someone installs this plugin without the plugin system.
+# Not a plugin — just a file ../../install.sh can drop into a repo or your home config.
 # See ../adversarial-review/install.manifest for the verb reference.
 
 name   CLAUDE.local.md
-about  A personal, uncommitted CLAUDE.local.md — per repo, or globally for every repo.
+about  A starter CLAUDE.local.md — personal notes for Claude, kept out of git.
 
-file   skills/claude-local/SKILL.md  skills/claude-local/SKILL.md  /claude-local  (init, link, status)
-bin    bin/claude-local              bin/claude-local              creates and edits the file
+personal  CLAUDE.local.md  CLAUDE.local.md  your notes for Claude, never committed
 
-rewrite  ${CLAUDE_PLUGIN_ROOT}/bin/claude-local  @ROOT@/bin/claude-local
-rewrite  /claude-local:claude-local              /claude-local
+tip  @BASE@/CLAUDE.local.md is yours now — open it and write what Claude keeps getting wrong
+tip  if it isn't picked up, add a line `@CLAUDE.local.md` to the CLAUDE.md beside it
 
-tip  /claude-local init            this repo, git-excluded
-tip  /claude-local init --global   every repo
-tip  /claude-local link            import it from CLAUDE.md so it loads
-
-note  your CLAUDE.local.md files were left alone
+note  your CLAUDE.local.md was left alone — delete it yourself if you want it gone
