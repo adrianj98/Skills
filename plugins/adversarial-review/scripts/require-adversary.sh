@@ -2,8 +2,8 @@
 # Stop hook: nudge once per distinct diff before Claude declares a coding turn done.
 # Fires at most once per unique working-tree state, so it can never loop.
 #
-# Deliberately cheap: the lenses run in parallel and each reviewer is capped at 10
-# turns (see agents/adversary.md), so the cost is one short round. It also stays
+# Deliberately bounded: the lenses run in parallel and each reviewer is capped at 40
+# turns (see agents/adversary.md), so the cost is one round. It also stays
 # quiet on small or docs-only diffs.
 #
 # Tuning:      ADVERSARY_MIN_LINES=n   skip diffs smaller than n changed lines
@@ -59,8 +59,8 @@ These changes have not been adversarially reviewed.
 
 Delegate the diff to the `adversary` subagent (Task tool, subagent_type: adversary)
 — one call per lens: correctness, failure-paths, lifetime-and-async, contract-drift.
-Send all four in a SINGLE message so they run in parallel. Each one is capped at 10
-turns, so the whole review is one short round, not an audit.
+Send all four in a SINGLE message so they run in parallel. Each one is capped at 40
+turns, so the whole review is one round, not an audit.
 
 Do not review your own diff yourself; that is the whole point.
 

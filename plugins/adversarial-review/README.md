@@ -157,26 +157,32 @@ generated code — skimmed against the diff, not worked through end to end.
 
 ### The turn ceiling
 
-`maxTurns: 10`, in the frontmatter. Same trick as `disallowedTools`: a structural limit,
+`maxTurns: 40`, in the frontmatter. Same trick as `disallowedTools`: a structural limit,
 not a request the agent can reason its way past.
 
-This is the setting that decides whether you keep the plugin. Reviewer agents don't get
-slow by finding too much — they get slow by *looking*. One agent opens the diff, then a
-caller, then the caller's caller, then greps the repo for a type, then runs the suite, and
-forty turns later it reports the same two findings it had by turn six. Multiply by four
-lenses and you've lost an hour at the end of every turn. Parallelism doesn't save you here;
-the lenses run concurrently, so the slowest single agent *is* the wall-clock cost.
+This is the setting that decides whether you keep the plugin, and it's a real trade. Reviewer
+agents don't get slow by finding too much — they get slow by *looking*. One agent opens the
+diff, then a caller, then the caller's caller, then greps the repo for a type, then runs the
+suite. Multiply by four lenses and a ceiling that's too high costs you an hour at the end of
+every turn; parallelism doesn't save you, since the lenses run concurrently and the slowest
+single agent *is* the wall-clock cost. But too low a ceiling buys that speed with
+`plausible` — a reviewer that can't reach the caller can't tell you whether the contract
+actually broke.
 
-So the prompt spends the budget explicitly: turn 1 reads the diff, turns 2–7 are at most
-two batched rounds of follow-up reads, by turn 8 stop reading and write. Anything unchecked
-ships as `plausible` — an unverified finding the reader can check in thirty seconds beats
-four turns spent verifying it. Walking the call tree, repo-wide greps, running the suite,
-and building a repro harness are all named as out of scope, and "nothing found" is a
-legitimate two-line answer rather than something it has to justify.
+40 turns is enough to follow a diff outward — callers, types, the tests that cover it — and
+still nowhere near an audit. The prompt spends it explicitly: turn 1 reads the diff, turns
+2–32 follow the threads that are still about *this diff*, by turn 33 stop reading and write.
+Anything unchecked still ships as `plausible` rather than costing more turns. Opening files
+the diff doesn't touch, running the full suite, and building a repro harness stay out of
+scope, finishing early is the normal case, and "nothing found" is a legitimate two-line
+answer rather than something it has to justify.
 
 The ceiling is hard, and hitting it returns *nothing* — so the prompt has to make it land
 before the cliff, not just aim vaguely at brevity. The deep workflow keeps the same ceiling
-and buys depth by adding agents instead of lengthening them.
+and buys depth by adding agents instead of lengthening them: one file under one lens should
+finish well inside 40.
+
+If the nudge starts feeling slow on your repo, this is the number to lower.
 
 **Cheapest form**, one agent, one pass:
 
@@ -227,9 +233,10 @@ is CI.
 
 A nudge you hit automatically has to be cheap, or you start turning it off. Two things keep
 it that way. The lenses run **in parallel**, so four of them cost about one agent's
-wall-clock. And each reviewer is capped at **10 turns** (see below), so a lens can't wander
-off into the codebase for twenty minutes. Four capped agents at once is a short round; four
-uncapped ones sequentially is the afternoon you stopped using this.
+wall-clock. And each reviewer is capped at **40 turns** (see below), so a lens can follow a
+contract to its callers but can't wander off into the codebase for an hour. Four capped
+agents at once is one round; four uncapped ones sequentially is the afternoon you stopped
+using this.
 
 It also stays quiet on changes that don't earn it: docs and licence files are never
 counted, and a diff under 25 changed code lines is skipped entirely. Move that line with
@@ -293,7 +300,7 @@ repo secrets; `claude /install-github-app` does both.
 |---|---|---|---|
 | subagent alone | ~1 agent | you ask | yes, trivially |
 | workflow | ~76 agents on a 10-file diff | you ask | yes, trivially |
-| Stop hook | ~4 agents, capped at 10 turns each | automatically, once per diff ≥25 code lines | yes, one command |
+| Stop hook | ~4 agents, capped at 40 turns each | automatically, once per diff ≥25 code lines | yes, one command |
 | GitHub Action | ~50+ agents | every PR | not from your laptop |
 
 Same reviewer underneath all four. The escalation is purely about how hard it is to not
