@@ -21,7 +21,8 @@ directly, since the file may not carry an exec bit after install.
 - **`run`** — ignore the toggle and review the current diff now. Spawn four subagents in
   one message so they run in parallel (Task tool, `subagent_type: adversary`), one per lens
   — correctness, failure-paths, lifetime-and-async, contract-drift — each starting from
-  `git diff HEAD`. Each is capped at 40 turns, so this is one round and not an audit; let them
+  `git diff HEAD`, or, if that is empty because the work is already committed, from the
+  commits that are new (`git diff @{u}`, `git diff HEAD~1`, or the range the user names). Each is capped at 40 turns, so this is one round and not an audit; let them
   finish and report, don't chase their findings further yourself. Fix nothing unless asked.
   For a heavier pass with refutation voting, use `/adversarial-review:review` instead.
 - **anything else** — show the usage line and the current state.

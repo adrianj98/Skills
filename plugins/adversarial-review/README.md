@@ -132,8 +132,9 @@ is [`install.manifest`](install.manifest) — `install.sh` itself is generic.
 agents/adversary.md          the reviewer — read-only, assumes the code is wrong
 skills/adversary/SKILL.md    /adversarial-review:adversary — toggle, status, one-off run
 workflows/review.js          /adversarial-review:review — 4 lenses + refutation voting
-hooks/hooks.json             registers the Stop hook
+hooks/hooks.json             registers the Stop and SessionStart hooks
 scripts/require-adversary.sh the Stop hook itself
+scripts/session-base.sh      SessionStart: records where the session began
 bin/adversary                the on/off switch (on PATH inside Claude's Bash tool)
 ```
 
@@ -222,14 +223,36 @@ or a custom `lenses` array.
 
 ### `hooks/` — the local nudge
 
-A Stop hook. Stop hooks fire when Claude tries to end its turn; exit `2` means *you're not
-done* and Claude keeps working with the message as its instruction.
+A Stop hook, plus a SessionStart hook that exists only to give it an anchor. Stop hooks
+fire when Claude tries to end its turn; exit `2` means *you're not done* and Claude keeps
+working with the message as its instruction.
 
-This one hashes the working-tree diff, compares it to a marker in `.git/`, and on a new
-state tells Claude to hand the diff to the `adversary` subagent instead of reviewing its
-own work. It writes the marker *before* blocking, so it fires at most once per distinct
-diff and can't loop — which also makes it a nudge rather than a wall. Deliberate. The wall
-is CI.
+On a new state it tells Claude to hand the changes to the `adversary` subagent instead of
+reviewing its own work. It writes its marker *before* blocking, so it fires at most once
+per distinct state and can't loop — which also makes it a nudge rather than a wall.
+Deliberate. The wall is CI.
+
+**What counts as "the changes"** is the part that's easy to get wrong. `git diff HEAD` is
+the obvious answer and it's wrong: the moment anything is committed — and plenty of setups
+commit automatically at the end of a turn — it returns nothing, and the nudge goes silent
+exactly when there is most to review. So the range is anchored instead:
+
+1. the commit HEAD was at when this hook last nudged; anything before that has been through
+   a review already,
+2. failing that, where the session started — `scripts/session-base.sh` records `HEAD` on
+   SessionStart, one file per session under `.git/`, swept after a week,
+3. failing that, `HEAD`, i.e. the old uncommitted-only behaviour.
+
+Both anchors are checked with `merge-base --is-ancestor` first, so a rebase, reset or pull
+can't leave the hook diffing against a commit that is no longer on this line of history.
+The nudge names the resulting range (`git diff <sha>`) in its message, because a reviewer
+left to guess will run `git diff HEAD` and find nothing.
+
+Untracked files are carried alongside the diff and listed by name: a file Claude created
+but never staged is invisible to `git diff`, and a brand-new file is exactly what you want
+read. The marker fingerprints file *contents* rather than diff text, so the same code
+doesn't come back for a second review when it crosses from untracked to committed, and the
+anchor advances to the commit once the work it covered lands there.
 
 A nudge you hit automatically has to be cheap, or you start turning it off. Two things keep
 it that way. The lenses run **in parallel**, so four of them cost about one agent's
@@ -239,7 +262,8 @@ agents at once is one round; four uncapped ones sequentially is the afternoon yo
 using this.
 
 It also stays quiet on changes that don't earn it: docs and licence files are never
-counted, and a diff under 25 changed code lines is skipped entirely. Move that line with
+counted — not towards the threshold and not in the fingerprints — and a change under 25
+code lines is skipped entirely. Move that line with
 `ADVERSARY_MIN_LINES` (`0` reviews everything):
 
 ```bash
@@ -300,7 +324,7 @@ repo secrets; `claude /install-github-app` does both.
 |---|---|---|---|
 | subagent alone | ~1 agent | you ask | yes, trivially |
 | workflow | ~76 agents on a 10-file diff | you ask | yes, trivially |
-| Stop hook | ~4 agents, capped at 40 turns each | automatically, once per diff ≥25 code lines | yes, one command |
+| Stop hook | ~4 agents, capped at 40 turns each | automatically, once per change ≥25 code lines | yes, one command |
 | GitHub Action | ~50+ agents | every PR | not from your laptop |
 
 Same reviewer underneath all four. The escalation is purely about how hard it is to not
