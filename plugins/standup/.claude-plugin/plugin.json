@@ -1,0 +1,10 @@
+{
+  "name": "standup",
+  "displayName": "Standup",
+  "version": "0.1.0",
+  "description": "A very short list of what you worked on since yesterday morning, from the commits in every worktree of the current repo.",
+  "author": { "name": "Adrian Jones", "url": "https://github.com/adrianj98" },
+  "repository": "https://github.com/adrianj98/skills",
+  "license": "MIT",
+  "keywords": ["standup", "git", "worktrees", "commits", "daily"]
+}

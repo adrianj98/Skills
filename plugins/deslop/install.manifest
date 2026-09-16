@@ -1,0 +1,17 @@
+# What ../../install.sh copies when someone installs this plugin without the plugin system.
+# Verbs are documented in ../adversarial-review/install.manifest.
+
+name   Deslop
+about  Finds the AI slop in what just changed, reports it, and on request cuts it.
+
+file   skills/deslop/SKILL.md  skills/deslop/SKILL.md  /deslop
+file   scripts/scan.sh         skills/deslop/scan.sh   the mechanical first pass
+
+# Outside the plugin system there is no ${CLAUDE_PLUGIN_ROOT} and no /plugin:skill namespace.
+rewrite  ${CLAUDE_PLUGIN_ROOT}/scripts/scan.sh  @ROOT@/skills/deslop/scan.sh
+rewrite  /deslop:deslop                          /deslop
+
+tip  /deslop              what the slop is, as a report
+tip  /deslop run          find it and cut it, in one pass
+tip  /deslop all          the whole repo, not just what changed
+tip  /deslop --base main  measure against a different base

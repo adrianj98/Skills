@@ -32,6 +32,36 @@ Ships four levels of the same idea, escalating by how hard it is to skip:
 
 [Full README →](plugins/adversarial-review/README.md)
 
+### [`standup`](plugins/standup) · v0.1.0
+
+`/standup` — a very short list of what you worked on since yesterday morning. It reads the
+commits reachable from every worktree of the current repo, so work on a branch checked out
+somewhere else still counts, and folds related commits into one bullet each.
+
+```bash
+claude plugin install standup@adrianj98-skills
+```
+
+`/standup since friday` widens the window; `/standup everyone` includes every author.
+
+### [`deslop`](plugins/deslop) · v0.1.0
+
+`/deslop` — what in this change reads like a machine wrote it, as a report you can act on;
+`/deslop run` cuts it in the same pass. Comments that restate the line below them, `try/catch`
+around calls that can't throw, wrappers with one caller, the `as any` that made the error go
+away, README paragraphs about leveraging a robust and comprehensive toolkit.
+
+```bash
+claude plugin install deslop@adrianj98-skills
+```
+
+A deterministic scan over the lines your branch *added* produces candidates; the skill then
+reads files the diff never touched to learn what this repo's authors actually write, and
+throws out everything that only looks like slop next to some other codebase. `/deslop all`
+audits the whole repo instead.
+
+[Full README →](plugins/deslop/README.md)
+
 ## Installing without the plugin system
 
 `install.sh` copies a plugin's files into `~/.claude/` or a repo's `.claude/`, rewrites its

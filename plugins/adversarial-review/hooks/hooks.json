@@ -1,24 +1,29 @@
 {
-  "SessionStart": [
-    {
-      "matcher": "",
-      "hooks": [
-        {
-          "type": "command",
-          "command": ["bash", "${CLAUDE_PLUGIN_ROOT}/scripts/session-base.sh"]
-        }
-      ]
-    }
-  ],
-  "Stop": [
-    {
-      "matcher": "",
-      "hooks": [
-        {
-          "type": "command",
-          "command": ["bash", "${CLAUDE_PLUGIN_ROOT}/scripts/require-adversary.sh"]
-        }
-      ]
-    }
-  ]
+  "description": "Adversarial review: anchor the session on start, nudge for a split-context review on Stop",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/session-base.sh"]
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/require-adversary.sh"]
+          }
+        ]
+      }
+    ]
+  }
 }

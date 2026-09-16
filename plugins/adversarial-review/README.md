@@ -134,6 +134,7 @@ skills/adversary/SKILL.md    /adversarial-review:adversary — toggle, status, o
 workflows/review.js          /adversarial-review:review — 4 lenses + refutation voting
 hooks/hooks.json             registers the Stop and SessionStart hooks
 scripts/require-adversary.sh the Stop hook itself
+scripts/mechanical-pass.sh   opt-in: runs your own linters first, hands the output over
 scripts/session-base.sh      SessionStart: records where the session began
 bin/adversary                the on/off switch (on PATH inside Claude's Bash tool)
 ```
@@ -156,9 +157,22 @@ The body carries the behavior: find concrete reasons the diff breaks, every find
 concrete failure scenario, no style notes, plus a list of where bugs actually hide in
 generated code — skimmed against the diff, not worked through end to end.
 
+It opens with an **input contract** — what the prompt should carry (the diff itself, a scratch
+directory, optionally the facts earlier rounds established, the previous round's findings, and
+anything the repo's own linters already know) and what to do when one of those is missing: name
+it in a line and review what is reviewable, never stop to ask.
+
+It closes with a **verdict word**, and the vocabulary is exactly three: `block` when a confirmed
+finding loses data, corrupts state that outlives the process, or crashes a path ordinary input
+reaches; `concerns` when there are findings and none clear that bar; `clean` when there are none.
+Derived, not felt — the reviewer computes it from its own findings, and the parent reports the
+worst one verbatim rather than paraphrasing four reports into a shrug. Findings carry a severity
+(`critical`/`high`/`medium`/`low`) from the same enum the deep workflow already uses, so both
+paths speak one vocabulary.
+
 ### The turn ceiling
 
-`maxTurns: 40`, in the frontmatter. Same trick as `disallowedTools`: a structural limit,
+`maxTurns: 22`, in the frontmatter. Same trick as `disallowedTools`: a structural limit,
 not a request the agent can reason its way past.
 
 This is the setting that decides whether you keep the plugin, and it's a real trade. Reviewer
@@ -170,26 +184,117 @@ single agent *is* the wall-clock cost. But too low a ceiling buys that speed wit
 `plausible` — a reviewer that can't reach the caller can't tell you whether the contract
 actually broke.
 
-40 turns is enough to follow a diff outward — callers, types, the tests that cover it — and
-still nowhere near an audit. The prompt spends it explicitly: turn 1 reads the diff, turns
-2–32 follow the threads that are still about *this diff*, by turn 33 stop reading and write.
-Anything unchecked still ships as `plausible` rather than costing more turns. Opening files
-the diff doesn't touch, running the full suite, and building a repro harness stay out of
-scope, finishing early is the normal case, and "nothing found" is a legitimate two-line
-answer rather than something it has to justify.
+Latency here is exploration-bound, not input-bound: across 24 instrumented runs a
+5,266-line diff and a 94-line one took the same time to review (333s against 327s), and
+tool calls tracked duration at about 8.6s each. The ceiling is the lever; the size of what
+you feed it is not. 22 turns is enough to follow a diff outward — callers, types, the tests
+that cover it — and cuts a tail that didn't pay: mean 19 tool calls per run, reaching 35,
+while the three best findings of that session came from the *shortest* runs, at 12, 13 and
+15 calls.
 
-The ceiling is hard, and hitting it returns *nothing* — so the prompt has to make it land
-before the cliff, not just aim vaguely at brevity. The deep workflow keeps the same ceiling
+A turn ceiling doesn't bound time, though, and agents can't read a clock. So the prompt
+gives them something they can count: **at the 15th tool call, stop investigating and write
+up.** Not "wrap up soon" — stop, with anything unchecked shipped as `plausible` or named in
+one line. That checkpoint is what clips the straggler, which was 18% of all wall-clock and
+run-to-run variance rather than any one slow lens. Opening files the diff doesn't touch,
+running the full suite, and building a repro harness stay out of scope, finishing early is
+the normal case, and "nothing found" is a legitimate two-line answer rather than something
+it has to justify.
+
+The ceiling is hard, and hitting it hands back whatever was written so far marked *partial* —
+an investigation log with no findings section, which is the review wasted — so the prompt has
+to make it land before the ceiling, not just aim vaguely at brevity. A turn is one
+reasoning-and-tools cycle, however many calls it batches, so counting tool calls over-counts
+in the safe direction. The deep workflow keeps the same ceiling
 and buys depth by adding agents instead of lengthening them: one file under one lens should
-finish well inside 40.
+finish well inside 22.
 
-If the nudge starts feeling slow on your repo, this is the number to lower.
+If the nudge starts feeling slow on your repo, this is the number to lower — and if findings
+start drying up too, restore turns five at a time. If your diffs vary wildly in size, pass
+the ceiling per invocation instead of fixing it in frontmatter.
+
+Two more things the agent is told, both cheap and both paid for by measurement. When a
+finding turns on *which* inputs reach a branch, enumerate input classes — empty,
+whitespace-only, comment-only, delimiter-only, bare scalar, null, BOM, CRLF, zero value,
+one, max — rather than trying two and concluding "unreachable"; that mistake gets a guard
+deleted and costs whole rounds to undo, and it happened between lenses running the *same
+model*, so it's a methodology failure a bigger model won't fix. And probe scripts go in the
+scratch directory named in the prompt, never the repo, with `git checkout --`, `restore`,
+`stash` and `reset` off-limits: read-only tooling still leaves `Bash` wide open, and
+someone is editing these files while the reviewer reads them.
+
+### Don't fetch the diff four times
+
+`/adversarial-review:adversary run` captures the diff **once** and pastes it into every lens
+prompt under a `## The diff` heading, and the Stop hook's nudge asks for the same. Four agents
+each running the same `git diff` is four copies of the same latency on the critical path, and
+shrinking or sharding the input buys nothing anyway — see the ceiling above. The deep workflow
+is the one exception: each of its agents is scoped to a single file and fetches that file's
+diff itself, since a workflow script has no filesystem access to fetch it for them.
+
+The same logic applies across rounds. Each lens ends its report with **Established by
+execution**: the facts it settled by actually running something — a function's real return
+values, a library's actual error text, which callers exist — one line each, with how. Those
+get appended to `adversary-facts.md` in the scratch directory and pasted into the next
+round under `## Already established — do not re-derive`. Without it, four lenses write four
+throwaway probes for the same function every round; one measured session re-derived a single
+lookup table about sixteen times.
+
+Two files end up in that scratch directory, and they do different jobs: `adversary-facts.md`
+carries what was *proven by running it*, so nobody proves it twice, and `adversary-findings.md`
+carries what was *found*, so the next round can score it rather than hunt it.
 
 **Cheapest form**, one agent, one pass:
 
 ```
 Have the adversary subagent review my uncommitted changes.
 ```
+
+### Round two is scored, not re-hunted
+
+Fixing a finding is itself a change, so the hook fires again — and a reviewer that hunts from
+scratch every time turns one review into a chain of ever-smaller ones. In the measured session
+behind this design, rounds 4, 5 and 6 reviewed 94, 62 and 94 lines inside a function that only
+existed because of round 1. Six rounds, 24 minutes, 1.32M tokens.
+
+So the second round is a different job. Hand the reviewer the previous findings under a
+`## Prior findings` heading and it scores them instead of hunting: one line each — `resolved`,
+`partial` or `unresolved` — tied to what the code visibly does now, then at most two regressions
+the fix batch itself introduced, then nothing. A fix the parent *claims* but the reviewer can't
+see is `unresolved`; a fix answered mechanically, where the shape changed but the failure
+scenario still runs, is `partial`. The budget drops from 15 tool calls to 6, and one reviewer
+does it rather than four.
+
+Two things put it back into a full review, and only these two: the fix *rewrote* rather than
+patched — the diff touches files or functions no finding named — or every prior finding was
+`plausible`, which means nothing was ever verified and there is nothing to score.
+
+This is the mechanism that ends the chain. The line threshold below is no longer asked to do it
+by staying silent.
+
+The hook arms it: when a round reports, its findings go to `.git/adversary-findings.md` — inside
+`.git/` because it has to outlive the session to be there when the fixes land — and the next
+nudge asks for a scoring pass instead of a review. It emits **one** of those two instructions,
+never both, because a model handed both picks one and either pick is wrong half the time.
+
+A findings file that exists isn't automatically current, though, and a stale one is expensive: it
+downgrades the next unrelated change to one reviewer that has been told not to hunt. So the hook
+checks two things before believing it — the file was written after this session started, and the
+change is small enough to plausibly *be* a fix round (not at the four-lens rung). Both failures
+fall through to a full review, and the nudge says to delete the leftover. `SessionStart` sweeps
+one older than a week.
+
+### Findings two lenses found independently
+
+The lenses run blind to each other, which makes their overlap worth something. When the same
+finding comes back from two or more of them — matched on file *and* mechanism, since a race and
+an off-by-one at the same line are two different findings — it's promoted one severity level and
+marked `corroborated`.
+
+Promotion moves **severity only, never confidence**. Agreement is evidence that a thing matters,
+not evidence that it's true: in the same measured session, two lenses agreed a branch was
+unreachable, a guard was deleted on their word, and they were both wrong — it cost three further
+rounds to undo. Two `plausible`s stay `plausible`, at a higher severity.
 
 ### `workflows/review.js` — the thorough version
 
@@ -216,10 +321,12 @@ returns four shallow observations. Four told to ignore three quarters of the spa
 default to refuted when uncertain, each from a different angle: does that state even reach
 this line / do the callers and tests make that input possible / can you actually reproduce
 it. A finding needs 2 of 3 non-refuting votes to surface, tagged `CONFIRMED` (3/3) or
-`PLAUSIBLE` (2/3).
+`PLAUSIBLE` (2/3). The refuters are the same read-only reviewer as the attackers — the third
+angle is told to build a repro, and a repro belongs in scratch, not in your tree.
 
 Pass options as workflow args: `{"range": "main...HEAD"}`, `{"refuters": 1}` to see more,
-or a custom `lenses` array.
+or a custom `lenses` array. The vote threshold follows the refuter count (never more than the
+votes there are); set `threshold` to pin it.
 
 ### `hooks/` — the local nudge
 
@@ -231,6 +338,13 @@ On a new state it tells Claude to hand the changes to the `adversary` subagent i
 reviewing its own work. It writes its marker *before* blocking, so it fires at most once
 per distinct state and can't loop — which also makes it a nudge rather than a wall.
 Deliberate. The wall is CI.
+
+Firing at Stop means the review lands *inside* the answer Claude was about to write, so the
+message has to say what comes out the other side. Without that, the review report becomes the
+whole reply: the user asked for a feature and gets back a verdict word and four findings, with
+nothing about what was built. So the closing instruction puts it back in its place — the last
+message is still about the work, and the verdict, the fixes and anything left open ride along
+as a short block at the end of it.
 
 **What counts as "the changes"** is the part that's easy to get wrong. `git diff HEAD` is
 the obvious answer and it's wrong: the moment anything is committed — and plenty of setups
@@ -254,21 +368,85 @@ read. The marker fingerprints file *contents* rather than diff text, so the same
 doesn't come back for a second review when it crosses from untracked to committed, and the
 anchor advances to the commit once the work it covered lands there.
 
+Edits that were already in the tree when the session opened are yours, not the session's.
+`SessionStart` fingerprints them alongside the anchor, and a Stop that leaves them exactly as
+they were stays quiet — asking a question no longer gets you a review of your own half-finished
+branch. Once Claude changes anything, they're inside the range like everything else.
+
 A nudge you hit automatically has to be cheap, or you start turning it off. Two things keep
 it that way. The lenses run **in parallel**, so four of them cost about one agent's
-wall-clock. And each reviewer is capped at **40 turns** (see below), so a lens can follow a
+wall-clock. And each reviewer is capped at **22 turns** (see below), so a lens can follow a
 contract to its callers but can't wander off into the codebase for an hour. Four capped
 agents at once is one round; four uncapped ones sequentially is the afternoon you stopped
 using this.
 
-It also stays quiet on changes that don't earn it: docs and licence files are never
-counted — not towards the threshold and not in the fingerprints — and a change under 25
-code lines is skipped entirely. Move that line with
-`ADVERSARY_MIN_LINES` (`0` reviews everything):
+It also stays quiet on changes that don't earn it: docs and licence files are never counted —
+not towards the threshold and not in the fingerprints — and a change under 40 code lines is
+skipped entirely. Move that line with `ADVERSARY_MIN_LINES` (`0` reviews everything):
 
 ```bash
-ADVERSARY_MIN_LINES=100 claude    # only sizeable diffs
+ADVERSARY_MIN_LINES=0 claude      # review everything
+ADVERSARY_MIN_LINES=300 claude    # only sizeable diffs
 ```
+
+Above the line, the *number of lenses* scales rather than the decision to review at all. Four
+reviewers on a two-file fix is most of what a review costs and little of what it returns:
+
+| changed code lines | lenses |
+| --- | --- |
+| under 40 | none — the hook stays quiet |
+| 40–150 | `correctness` |
+| 150–600 | `correctness`, `failure-paths` |
+| over 600, or 8+ files | all four |
+
+One thing a line count can't see, so the nudge says it in a line: add `contract-drift` at any
+size when the diff changed an exported signature, a return type, or a public nullability.
+`ADVERSARY_LENSES=all`, or a comma-separated list, overrides the ladder when it guesses wrong.
+
+Two more things the nudge says, both from the literature rather than from this plugin's own
+measurements. **Fix only what a reviewer marked `confirmed`.** Same-model reviewers fanned out
+without a filter share their true positives and add their false ones — on real PRs, adding a
+second reviewer lowered F1 — so the hook path, which has no refutation vote, leans on the
+reviewer's own confirmed/plausible split instead: a plausible finding is mentioned, never acted
+on. And **`ADVERSARY_MODEL`** asks for the reviewers to be spawned on a different model from
+the one that wrote the code; self-preference in LLM judges is measured, not hypothetical.
+
+```bash
+ADVERSARY_MODEL=claude-opus-5 claude    # the code is not judged by the model that wrote it
+```
+
+### Handing over what a linter already knows
+
+impeccable — the design plugin — runs a compiled detector on *every* edit and a model reviewer
+only at Stop, and tells the reviewer plainly: "do not run a second detector pass; mechanical
+findings belong to the parent's hooks." That's the right split. A reviewer that spends three of
+its fifteen tool calls rediscovering what `tsc` prints in half a second is wasting the half of
+the budget that could have followed a contract to its callers.
+
+`scripts/mechanical-pass.sh` is the cheap tier. Give it your own checks and it runs them once,
+before the nudge, and embeds the output under a heading the reviewers are told to treat as
+already taken:
+
+```bash
+ADVERSARY_CHECK="npm run lint --silent" claude     # one command, this session
+echo 'cargo clippy --quiet' >> .git/adversary-checks  # persistent, per repo
+```
+
+Two deliberate constraints. **It is opt-in** — there is no default command, because guessing a
+repo's build tooling and running it in a Stop hook is how you get a plugin people turn off. And
+**the config never comes from a tracked file**: `.git/adversary-checks` lives inside `.git/`,
+which no clone carries, so a repo you check out can't ship commands that run on your first Stop
+hook. Each check gets 10 seconds (`ADVERSARY_CHECK_TIMEOUT`), output is capped, and a command
+that hangs, exits non-zero or doesn't exist is reported as "did not complete" — the review goes
+ahead without it. It never blocks.
+
+Two details that only showed up by measuring, both about the same thing — a check you kill is not
+a check that stopped. Its output goes to a file rather than up a pipe, because a background child
+holding the inherited stdout blocks the read long after the timeout fired (measured: 8 seconds
+under a 2-second timeout). And each check gets its *own* file, because that same orphan keeps
+writing at its own offset, straight into the next check's output if they share one. A timeout of
+`0` is rejected rather than honored: both `timeout 0` and perl's `alarm 0` mean "no alarm at all",
+which would quietly remove the only bound there is.
 
 ### `bin/adversary` — the off switch
 
@@ -295,7 +473,7 @@ the exec bit, so nothing in the plugin depends on it. Resolution order, first ma
 | | where | scope |
 |---|---|---|
 | 1 | `ADVERSARY_REVIEW=0` | one session — `ADVERSARY_REVIEW=0 claude` |
-| 2 | `.git/adversary-review` | one repo — lives in `.git/`, so untracked by construction |
+| 2 | `.git/adversary-review` | one repo, every worktree of it — lives in the common git dir, so untracked by construction |
 | 3 | `~/.claude/adversary-review` | every repo |
 | 4 | — | default: on |
 
@@ -324,7 +502,7 @@ repo secrets; `claude /install-github-app` does both.
 |---|---|---|---|
 | subagent alone | ~1 agent | you ask | yes, trivially |
 | workflow | ~76 agents on a 10-file diff | you ask | yes, trivially |
-| Stop hook | ~4 agents, capped at 40 turns each | automatically, once per change ≥25 code lines | yes, one command |
+| Stop hook | 1–4 agents by diff size, capped at 22 turns each | automatically, once per change ≥40 code lines | yes, one command |
 | GitHub Action | ~50+ agents | every PR | not from your laptop |
 
 Same reviewer underneath all four. The escalation is purely about how hard it is to not
@@ -334,7 +512,7 @@ run it.
 
 | Bun | Here | Why it's load-bearing |
 |---|---|---|
-| separate context window | `Task`/`agent()` subagent | it never saw your reasoning, so it can't inherit your assumptions |
+| separate context window | `Agent`/`agent()` subagent | it never saw your reasoning, so it can't inherit your assumptions |
 | "the reviewer doesn't implement" | `disallowedTools: Write, Edit` | structural, not a prompt it can talk itself out of |
 | "its context: only the diff" | reviewer starts from `git diff` | reviewing the file invites judging intent; reviewing the diff invites finding breakage |
 | "assume the code is wrong" | the agent's framing: *find reasons this breaks* | "review this" gets you an approval; "find why this breaks" gets you findings |

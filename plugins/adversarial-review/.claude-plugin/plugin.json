@@ -1,8 +1,8 @@
 {
   "name": "adversarial-review",
   "displayName": "Adversarial Review",
-  "version": "0.1.0",
-  "description": "One agent writes, a separate agent with its own context window tries to prove it broken. Ships a read-only reviewer subagent, a multi-lens review workflow with a refutation pass, and an opt-out Stop-hook nudge.",
+  "version": "0.2.1",
+  "description": "One agent writes, a separate agent with its own context window tries to prove it broken. Ships a read-only reviewer subagent that returns a verdict word, an opt-out Stop-hook nudge that scales lens count to the size of the change, and a multi-lens workflow with a refutation pass.",
   "author": { "name": "Adrian Jones", "url": "https://github.com/adrianj98" },
   "repository": "https://github.com/adrianj98/skills",
   "license": "MIT",

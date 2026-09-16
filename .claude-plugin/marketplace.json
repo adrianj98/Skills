@@ -12,11 +12,35 @@
       "displayName": "Adversarial Review",
       "source": "./plugins/adversarial-review",
       "description": "A reviewer that assumes your code is wrong, in a context window that never saw you write it. Split-context review modelled on Bun's Zig-to-Rust rewrite.",
-      "version": "0.1.0",
+      "version": "0.2.1",
       "author": { "name": "Adrian Jones", "url": "https://github.com/adrianj98" },
       "repository": "https://github.com/adrianj98/skills",
       "license": "MIT",
       "keywords": ["code-review", "adversarial", "subagents", "workflow", "hooks", "quality"],
+      "category": "development"
+    },
+    {
+      "name": "standup",
+      "displayName": "Standup",
+      "source": "./plugins/standup",
+      "description": "A very short list of what you worked on since yesterday morning, from the commits in every worktree of the current repo.",
+      "version": "0.1.0",
+      "author": { "name": "Adrian Jones", "url": "https://github.com/adrianj98" },
+      "repository": "https://github.com/adrianj98/skills",
+      "license": "MIT",
+      "keywords": ["standup", "git", "worktrees", "commits", "daily"],
+      "category": "productivity"
+    },
+    {
+      "name": "deslop",
+      "displayName": "Deslop",
+      "source": "./plugins/deslop",
+      "description": "Finds the AI slop in what just changed — restating comments, defensive checks on trusted values, dead abstraction, inflated prose — reports it, and on request cuts it.",
+      "version": "0.1.0",
+      "author": { "name": "Adrian Jones", "url": "https://github.com/adrianj98" },
+      "repository": "https://github.com/adrianj98/skills",
+      "license": "MIT",
+      "keywords": ["slop", "cleanup", "code-review", "quality", "comments", "prose"],
       "category": "development"
     }
   ]

@@ -11,8 +11,13 @@ set -uo pipefail
 
 GLOBAL="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/adversary-review"
 REPO=""
+# The common dir, not the git dir: inside a linked worktree `--git-dir` is
+# .git/worktrees/<name>, and a switch written there silences one worktree while the
+# README promises "this repo". The common dir is shared by every worktree of the repo.
 if git rev-parse --git-dir >/dev/null 2>&1; then
-  REPO="$(git rev-parse --git-dir)/adversary-review"
+  COMMON="$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" ||
+  COMMON="$(cd "$(git rev-parse --git-common-dir)" && pwd)"
+  REPO="$COMMON/adversary-review"
 fi
 
 resolve() {

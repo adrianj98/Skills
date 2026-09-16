@@ -1,0 +1,10 @@
+{
+  "name": "deslop",
+  "displayName": "Deslop",
+  "version": "0.1.0",
+  "description": "Finds the AI slop in what just changed — restating comments, defensive checks on trusted values, dead abstraction, inflated prose — reports it, and on request cuts it.",
+  "author": { "name": "Adrian Jones", "url": "https://github.com/adrianj98" },
+  "repository": "https://github.com/adrianj98/skills",
+  "license": "MIT",
+  "keywords": ["slop", "cleanup", "code-review", "quality", "comments", "prose"]
+}

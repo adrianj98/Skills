@@ -10,11 +10,14 @@ export const meta = {
   ],
 }
 
-// args: { range?: string, lenses?: string[], refuters?: number, threshold?: number }
+// args: { range?: string, lenses?: string[], refuters?: number, threshold?: number, scratch?: string }
 const cfg = args || {}
 const RANGE = cfg.range || ''
+const SCRATCH = cfg.scratch || '${TMPDIR:-/tmp}/adversarial-review'
 const REFUTERS = cfg.refuters || 3
-const THRESHOLD = cfg.threshold || 2 // survivors need this many non-refuting votes
+// Survivors need this many non-refuting votes. The default follows the refuter count: a fixed
+// 2 with `refuters: 1` is a bar one vote can never clear, and every finding silently dies.
+const THRESHOLD = cfg.threshold || Math.min(2, REFUTERS)
 
 const LENSES = cfg.lenses || [
   { key: 'correctness', focus: 'evaluation order, boundaries, off-by-one, sign and overflow, empty/null/zero cases, and logic that is subtly not what the surrounding code expects' },
@@ -48,6 +51,10 @@ const FINDINGS_SCHEMA = {
   type: 'object',
   additionalProperties: false,
   properties: {
+    // The reviewer's standing instructions open every report with a verdict word. The schema
+    // has to have somewhere to put it: additionalProperties:false would otherwise fail the
+    // whole response, and a failed response is a lens silently contributing nothing.
+    verdict: { type: 'string', enum: ['block', 'concerns', 'clean'] },
     tried: { type: 'string' },
     findings: {
       type: 'array',
@@ -111,14 +118,16 @@ const attackPrompt = (unit, lens) =>
     '',
     'Start by running: git diff ' + scope.range + ' -- ' + unit.path,
     'Read surrounding code and callers as needed for context, but judge the code by what it does.',
+    'Scratch directory for any probe script: ' + SCRATCH + ' (never the repository).',
     '',
     'Your lens for this pass is ' + lens.key + '. Concentrate on: ' + lens.focus,
     'Other reviewers cover the other lenses — do not spread yourself thin.',
     '',
-    'Your 40-turn ceiling still applies, and one file under one lens should not need most of it —',
+    'Your 22-turn ceiling still applies, and one file under one lens should not need most of it —',
     'depth here comes from many agents, not long ones. Two exceptions to',
     'your standing instructions: report every finding you can justify (not just your top 3), and',
-    'fill in `tried` below even when you found nothing.',
+    'fill in `tried` below even when you found nothing. Your verdict word goes in `verdict`, not',
+    'in a first line of prose.',
     '',
     'Rules: no style, no naming, no "consider adding", no hypothetical refactors.',
     'Every finding needs concrete inputs or state and the resulting wrong behavior.',
@@ -147,6 +156,9 @@ const refutePrompt = (f, unit, i) =>
     'Set refuted=true if the claim is wrong, already handled elsewhere, unreachable, a style opinion,',
     'or describes pre-existing behavior this diff did not change.',
     'Set refuted=false only if the failure is real and this diff causes it.',
+    '',
+    'You are read-only. Any probe script goes in ' + SCRATCH + ', never in the repository, and',
+    'you delete it when you are done. Never git checkout/restore/stash/reset: someone is editing this tree.',
     '',
     'Budget: you are one vote of ' + REFUTERS + ' on one claim, so keep it to a handful of tool calls and',
     'batch independent ones into a single turn. If your angle needs more than that to settle, vote',
@@ -187,6 +199,9 @@ const perFile = await pipeline(
               label: 'refute:' + i + ':' + unit.path + ':' + f.line,
               phase: 'Verify',
               schema: VERDICT_SCHEMA,
+              // Same read-only reviewer as the attack pass. The default workflow subagent can
+              // Write and Edit, and the third angle tells it to build a repro.
+              agentType: 'adversary',
             })
           )
         ).then((votes) => {
@@ -199,7 +214,9 @@ const perFile = await pipeline(
             severity: f.severity,
             summary: f.summary,
             failure_scenario: f.failure_scenario,
-            verdict: survived === cast.length ? 'CONFIRMED' : 'PLAUSIBLE',
+            // Named `confidence`, not `verdict`: the reviewer's verdict word is the lens-level
+            // block/concerns/clean, and one key can't mean both.
+            confidence: survived === cast.length ? 'CONFIRMED' : 'PLAUSIBLE',
             votes: survived + '/' + cast.length,
           }
         })

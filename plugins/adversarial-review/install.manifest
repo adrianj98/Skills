@@ -18,6 +18,7 @@ file   skills/adversary/SKILL.md  skills/adversary/SKILL.md        /adversary  (
 bin    bin/adversary              hooks/adversary                  the on/off switch
 hook   SessionStart  scripts/session-base.sh       hooks/session-base.sh       anchors what counts as new
 hook   Stop          scripts/require-adversary.sh  hooks/require-adversary.sh  the Stop-hook nudge
+file   scripts/mechanical-pass.sh   hooks/mechanical-pass.sh   opt-in: runs your linters first
 
 # Outside the plugin system there is no ${CLAUDE_PLUGIN_ROOT} and no /plugin:skill namespace.
 rewrite  ${CLAUDE_PLUGIN_ROOT}/bin/adversary  @ROOT@/hooks/adversary
@@ -31,3 +32,4 @@ tip  bash "@ROOT@/hooks/adversary" off       silence the nudge in this repo
 
 note  your on/off state (.git/adversary-review, $CLAUDE_CONFIG_DIR/adversary-review) was left alone
 note  .git/adversary-base-* and .git/adversary-reviewed are scratch state; delete them at will
+note  .git/adversary-checks, if you made one, was left alone
