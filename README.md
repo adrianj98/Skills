@@ -62,6 +62,25 @@ audits the whole repo instead.
 
 [Full README →](plugins/deslop/README.md)
 
+### [`showmethedata`](plugins/showmethedata) · v0.1.0
+
+`/showmethedata UserSession` — how that data is stored and used by the code. Where it lives
+at rest, what shape it has in each layer and where those shapes disagree, who writes it, who
+reads it and what for, one write and one read traced end to end, and what eventually deletes
+it. Point it at a symbol, a table, a field, a file or a directory; with no target it maps the
+repo one paragraph per store.
+
+```bash
+claude plugin install showmethedata@adrianj98-skills
+```
+
+Just a prompt, no script: it orients on the repo's stores and schema files, greps every
+spelling of the target, follows each writer to where the data lands, reads the migration
+rather than the model, and reports the drift between layers with a `file:line` on both sides.
+It never edits anything.
+
+[Full README →](plugins/showmethedata/README.md)
+
 ## Installing without the plugin system
 
 `install.sh` copies a plugin's files into `~/.claude/` or a repo's `.claude/`, rewrites its

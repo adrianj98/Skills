@@ -42,6 +42,18 @@
       "license": "MIT",
       "keywords": ["slop", "cleanup", "code-review", "quality", "comments", "prose"],
       "category": "development"
+    },
+    {
+      "name": "showmethedata",
+      "displayName": "Show Me The Data",
+      "source": "./plugins/showmethedata",
+      "description": "Point it at a file, type, table, field or feature and it explains how that data is stored and used — where it lives, its shape across layers and where the shapes drift, who writes it, who reads it, how it moves, and when it dies.",
+      "version": "0.1.0",
+      "author": { "name": "Adrian Jones", "url": "https://github.com/adrianj98" },
+      "repository": "https://github.com/adrianj98/skills",
+      "license": "MIT",
+      "keywords": ["data", "data-flow", "schema", "storage", "database", "tracing", "codebase-understanding"],
+      "category": "development"
     }
   ]
 }

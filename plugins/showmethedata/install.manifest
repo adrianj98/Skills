@@ -1,0 +1,14 @@
+# What ../../install.sh copies when someone installs this plugin without the plugin system.
+# Verbs are documented in ../adversarial-review/install.manifest.
+
+name   Show Me The Data
+about  Point it at something and it explains how that data is stored and used by the code.
+
+file   skills/showmethedata/SKILL.md  skills/showmethedata/SKILL.md  /showmethedata
+
+# Outside the plugin system there is no /plugin:skill namespace.
+rewrite  /showmethedata:showmethedata  /showmethedata
+
+tip  /showmethedata UserSession        one record: where it lives, who writes and reads it
+tip  /showmethedata src/billing/       a directory: the stores it owns and touches
+tip  /showmethedata                    the whole repo, at the level of stores
