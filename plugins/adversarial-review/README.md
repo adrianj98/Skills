@@ -135,6 +135,7 @@ workflows/review.js          /adversarial-review:review — 4 lenses + refutatio
 hooks/hooks.json             registers the Stop and SessionStart hooks
 scripts/require-adversary.sh the Stop hook itself
 scripts/mechanical-pass.sh   opt-in: runs your own linters first, hands the output over
+scripts/agy-review.sh        opt-in: reviews with the Antigravity CLI instead of a subagent
 scripts/session-base.sh      SessionStart: records where the session began
 bin/adversary                the on/off switch (on PATH inside Claude's Bash tool)
 ```
@@ -172,7 +173,7 @@ paths speak one vocabulary.
 
 ### The turn ceiling
 
-`maxTurns: 22`, in the frontmatter. Same trick as `disallowedTools`: a structural limit,
+`maxTurns: 16`, in the frontmatter. Same trick as `disallowedTools`: a structural limit,
 not a request the agent can reason its way past.
 
 This is the setting that decides whether you keep the plugin, and it's a real trade. Reviewer
@@ -187,13 +188,14 @@ actually broke.
 Latency here is exploration-bound, not input-bound: across 24 instrumented runs a
 5,266-line diff and a 94-line one took the same time to review (333s against 327s), and
 tool calls tracked duration at about 8.6s each. The ceiling is the lever; the size of what
-you feed it is not. 22 turns is enough to follow a diff outward — callers, types, the tests
-that cover it — and cuts a tail that didn't pay: mean 19 tool calls per run, reaching 35,
-while the three best findings of that session came from the *shortest* runs, at 12, 13 and
-15 calls.
+you feed it is not. Those runs were made under a 22-turn ceiling: mean 19 tool calls per run,
+reaching 35, while the three best findings of that session came from the *shortest* runs, at
+12, 13 and 15 calls. Every turn is also tokens, so the ceiling now sits at 16 — enough to
+follow a diff outward to its callers, types and tests, and no tail past where the findings
+came from.
 
 A turn ceiling doesn't bound time, though, and agents can't read a clock. So the prompt
-gives them something they can count: **at the 15th tool call, stop investigating and write
+gives them something they can count: **at the 12th tool call, stop investigating and write
 up.** Not "wrap up soon" — stop, with anything unchecked shipped as `plausible` or named in
 one line. That checkpoint is what clips the straggler, which was 18% of all wall-clock and
 run-to-run variance rather than any one slow lens. Opening files the diff doesn't touch,
@@ -207,7 +209,7 @@ to make it land before the ceiling, not just aim vaguely at brevity. A turn is o
 reasoning-and-tools cycle, however many calls it batches, so counting tool calls over-counts
 in the safe direction. The deep workflow keeps the same ceiling
 and buys depth by adding agents instead of lengthening them: one file under one lens should
-finish well inside 22.
+finish well inside 16.
 
 If the nudge starts feeling slow on your repo, this is the number to lower — and if findings
 start drying up too, restore turns five at a time. If your diffs vary wildly in size, pass
@@ -225,8 +227,11 @@ someone is editing these files while the reviewer reads them.
 
 ### Don't fetch the diff four times
 
-`/adversarial-review:adversary run` captures the diff **once** and pastes it into every lens
-prompt under a `## The diff` heading, and the Stop hook's nudge asks for the same. Four agents
+`/adversarial-review:adversary run` captures the diff **once**, into a scratch file, and gives
+each lens that file's path under a `## The diff` heading; the Stop hook's nudge hands off to the
+same procedure. It used to paste the contents instead, which made the session re-emit the whole
+diff as output once per lens — the dearest tokens there are — where a reviewer's one Read costs
+almost nothing. Four agents
 each running the same `git diff` is four copies of the same latency on the critical path, and
 shrinking or sharding the input buys nothing anyway — see the ceiling above. The deep workflow
 is the one exception: each of its agents is scoped to a single file and fetches that file's
@@ -262,7 +267,7 @@ So the second round is a different job. Hand the reviewer the previous findings 
 `partial` or `unresolved` — tied to what the code visibly does now, then at most two regressions
 the fix batch itself introduced, then nothing. A fix the parent *claims* but the reviewer can't
 see is `unresolved`; a fix answered mechanically, where the shape changed but the failure
-scenario still runs, is `partial`. The budget drops from 15 tool calls to 6, and one reviewer
+scenario still runs, is `partial`. The budget drops from 12 tool calls to 6, and one reviewer
 does it rather than four.
 
 Two things put it back into a full review, and only these two: the fix *rewrote* rather than
@@ -374,11 +379,11 @@ they were stays quiet — asking a question no longer gets you a review of your 
 branch. Once Claude changes anything, they're inside the range like everything else.
 
 A nudge you hit automatically has to be cheap, or you start turning it off. Two things keep
-it that way. The lenses run **in parallel**, so four of them cost about one agent's
-wall-clock. And each reviewer is capped at **22 turns** (see below), so a lens can follow a
-contract to its callers but can't wander off into the codebase for an hour. Four capped
-agents at once is one round; four uncapped ones sequentially is the afternoon you stopped
-using this.
+it that way. The lenses run **in parallel**, so two of them cost about one agent's
+wall-clock. And each reviewer runs on **Haiku**, capped at **16 turns** (see below), so a lens
+can follow a contract to its callers but can't wander off into the codebase for an hour, and
+what it does spend is spent at the cheapest rate going. Wall-clock is only half of cheap; the
+other half is tokens, which is why the automatic path stops at two lenses.
 
 It also stays quiet on changes that don't earn it: docs and licence files are never counted —
 not towards the threshold and not in the fingerprints — and a change under 40 code lines is
@@ -395,24 +400,27 @@ reviewers on a two-file fix is most of what a review costs and little of what it
 | changed code lines | lenses |
 | --- | --- |
 | under 40 | none — the hook stays quiet |
-| 40–150 | `correctness` |
-| 150–600 | `correctness`, `failure-paths` |
-| over 600, or 8+ files | all four |
+| 40–600 | `correctness` |
+| over 600, or 8+ files | `correctness`, `failure-paths` |
+| only when asked (`ADVERSARY_LENSES=all`, `run all`) | all four |
 
-One thing a line count can't see, so the nudge says it in a line: add `contract-drift` at any
+One thing a line count can't see, so the skill says it in a line: add `contract-drift` at any
 size when the diff changed an exported signature, a return type, or a public nullability.
 `ADVERSARY_LENSES=all`, or a comma-separated list, overrides the ladder when it guesses wrong.
 
-Two more things the nudge says, both from the literature rather than from this plugin's own
+Two more things the nudge says — it is otherwise a few lines that hand off to the skill, which
+holds the procedure — both from the literature rather than from this plugin's own
 measurements. **Fix only what a reviewer marked `confirmed`.** Same-model reviewers fanned out
 without a filter share their true positives and add their false ones — on real PRs, adding a
 second reviewer lowered F1 — so the hook path, which has no refutation vote, leans on the
 reviewer's own confirmed/plausible split instead: a plausible finding is mentioned, never acted
-on. And **`ADVERSARY_MODEL`** asks for the reviewers to be spawned on a different model from
-the one that wrote the code; self-preference in LLM judges is measured, not hypothetical.
+on. And the reviewer runs on **Haiku** by default (`model: haiku` in the agent's frontmatter):
+cheap, and not the model that wrote the code — self-preference in LLM judges is measured, not
+hypothetical. **`ADVERSARY_MODEL`** spawns the reviewers on something stronger when a change
+deserves it.
 
 ```bash
-ADVERSARY_MODEL=claude-opus-5 claude    # the code is not judged by the model that wrote it
+ADVERSARY_MODEL=opus claude    # a stronger reviewer than the default Haiku, for this session
 ```
 
 ### Handing over what a linter already knows
@@ -447,6 +455,41 @@ under a 2-second timeout). And each check gets its *own* file, because that same
 writing at its own offset, straight into the next check's output if they share one. A timeout of
 `0` is rejected rather than honored: both `timeout 0` and perl's `alarm 0` mean "no alarm at all",
 which would quietly remove the only bound there is.
+
+### Reviewing with the Antigravity CLI instead
+
+Opt-in. If you have Google's Antigravity CLI (`agy`) installed, the reviewers can run there
+rather than as Claude subagents:
+
+```bash
+ADVERSARY_RUNNER=agy claude                  # this session
+# or persist it: "env": { "ADVERSARY_RUNNER": "agy" } in ~/.claude/settings.json
+```
+
+`/adversarial-review:adversary run` — and so the Stop hook's nudge, which hands off to it — then
+calls `scripts/agy-review.sh` once per lens instead of spawning a subagent. The script sends the
+same reviewer instructions (`agents/adversary.md`, minus its frontmatter) and the diff to
+`agy -p`, and prints a report in the same format, so synthesis, the findings file and scored
+rounds all work unchanged. Nothing is installed into Antigravity; Claude Code stays the driver.
+
+Two reasons to want it. The review spends Antigravity quota instead of Claude tokens — the
+Claude side is one Bash call per lens plus reading the report. And the reviewer is a different
+model family from the one that wrote the code, which is the strongest answer to self-preference
+there is.
+
+It stays read-only structurally, not by request. In print mode `agy` cannot prompt, so any tool
+that needs permission — every shell command — is auto-denied; the reviewer is left with agy's
+built-in file viewing and search. `--mode plan` and `--sandbox` sit behind that. The price is
+that nothing can be *run*: a finding is `confirmed` by tracing only, and **Established by
+execution** is always empty. There is no turn ceiling either, only `--print-timeout`.
+
+| variable | default | |
+| --- | --- | --- |
+| `ADVERSARY_AGY_MODEL` | `gemini-3.8-flash-medium` | anything `agy models` lists |
+| `ADVERSARY_AGY_TIMEOUT` | `300s` | the backstop a turn ceiling would have been |
+
+If `agy` is missing, times out, or answers without a verdict line, the script exits 3 and the
+skill runs that lens as the ordinary subagent — a failed run is never read as a clean review.
 
 ### `bin/adversary` — the off switch
 
@@ -502,7 +545,7 @@ repo secrets; `claude /install-github-app` does both.
 |---|---|---|---|
 | subagent alone | ~1 agent | you ask | yes, trivially |
 | workflow | ~76 agents on a 10-file diff | you ask | yes, trivially |
-| Stop hook | 1–4 agents by diff size, capped at 22 turns each | automatically, once per change ≥40 code lines | yes, one command |
+| Stop hook | 1–2 Haiku agents by diff size, capped at 16 turns each | automatically, once per change ≥40 code lines | yes, one command |
 | GitHub Action | ~50+ agents | every PR | not from your laptop |
 
 Same reviewer underneath all four. The escalation is purely about how hard it is to not

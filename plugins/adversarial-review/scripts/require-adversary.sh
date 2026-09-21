@@ -7,10 +7,11 @@
 # commits automatically is all of it. The anchor comes from scripts/session-base.sh
 # (SessionStart); without it this degrades to the uncommitted diff.
 #
-# Deliberately bounded three ways: the lenses run in parallel, each reviewer is capped at 22
-# turns (see agents/adversary.md), and the number of lenses scales with the size of the
-# change — a two-file fix gets one reviewer, a feature branch gets four. It also stays quiet
-# on small or docs-only diffs.
+# Deliberately cheap: the reviewers run on Haiku and are capped at 16 turns (see
+# agents/adversary.md), they read the diff from a file rather than having it pasted into each
+# prompt, and the number of lenses scales with the size of the change — most changes get one
+# reviewer, a feature branch gets two, and four only when asked. It also stays quiet on small
+# or docs-only diffs.
 #
 # Fixing a finding is itself a change, so it re-triggers this hook. What ends that chain is
 # the reviewer scoring the fixes instead of hunting again (agents/adversary.md, "Round two"),
@@ -21,8 +22,10 @@
 #              ADVERSARY_LENSES=...    force a lens set: `all`, or a comma-separated list
 #              ADVERSARY_CHECK=...     a lint/typecheck command whose output is handed to the
 #                                      reviewers (see scripts/mechanical-pass.sh)
-#              ADVERSARY_MODEL=...     spawn the reviewers on this model rather than the one
-#                                      that wrote the code (self-preference is a measured bias)
+#              ADVERSARY_RUNNER=agy    review with the Antigravity CLI instead of a Claude
+#                                      subagent (see scripts/agy-review.sh)
+#              ADVERSARY_MODEL=...     spawn the reviewers on this model instead of the
+#                                      default, Haiku (e.g. opus, for a change that matters)
 # Off switch:  adversary off          (this repo)
 #              adversary off --all    (everywhere)
 #              ADVERSARY_REVIEW=0     (one session)
@@ -154,11 +157,9 @@ HASH="$({ git diff --name-only "$BASE" 2>/dev/null | skip_prose
 # moved it, anything pre-existing is inside a range that has been through a review.
 [ -n "$PRE_HASH" ] && [ "$BASE" = "$SESSION_BASE" ] && [ "$HASH" = "$PRE_HASH" ] && exit 0
 
-# How many lenses this change is worth. Four reviewers on a two-file fix is most of what a
-# review costs and little of what it returns; a feature branch is the case they were for.
+# How many lenses this change is worth. Every lens is a whole agent run, so the automatic path
+# tops out at two; all four are there for the asking (ADVERSARY_LENSES=all, or `run all`).
 if [ "$CHANGED" -gt 600 ] || [ "$FILES" -ge 8 ]; then
-  LENSES="correctness, failure-paths, lifetime-and-async, contract-drift"
-elif [ "$CHANGED" -gt 150 ]; then
   LENSES="correctness, failure-paths"
 else
   LENSES="correctness"
@@ -173,12 +174,6 @@ case "$(printf '%s' "$FORCED" | tr 'A-Z' 'a-z')" in
   all)  LENSES="correctness, failure-paths, lifetime-and-async, contract-drift" ;;
   *)    LENSES="$FORCED" ;;
 esac
-case "$LENSES" in
-  *,*) CALL_WORD="one call per lens"
-       PARALLEL="Send them in a SINGLE message so they run in parallel." ;;
-  *)   CALL_WORD="one call"
-       PARALLEL="A change this size is worth one reviewer, not four." ;;
-esac
 
 # Exactly one fan-out instruction, never both. A change that followed findings is a scoring
 # round; a change that didn't is a review. Emitting both leaves the model to pick, and either
@@ -190,7 +185,7 @@ FINDINGS="$REPO_GIT_DIR/adversary-findings.md"
 # into a scoring pass against findings that describe different code: one reviewer, no hunt.
 # Two cheap guards, both failing towards a full review, which is the safe direction:
 #   - it has to have been written after this session started, i.e. these fixes are this session's
-#   - a fix round is a small change; one at the four-lens rung is not a fix round
+#   - a fix round is a small change; one at the top rung of the ladder is not a fix round
 findings_live() {
   [ -f "$FINDINGS" ] || return 1
   [ "$CHANGED" -gt 600 ] && return 1
@@ -203,27 +198,13 @@ findings_live() {
 }
 
 if findings_live; then
-  DIRECTIVE="The last round's findings are in $FINDINGS, and this change is what came of
-fixing them — so this is a verdict pass, not a new review. Send ONE \`adversary\` subagent
-(Agent tool, subagent_type: adversary) and paste that file into its prompt under a
-\"## Prior findings\" heading. It will score each one — resolved, partial or unresolved —
-instead of hunting from scratch, and that is what ends the fix-review chain.
-
-Afterwards: delete $FINDINGS if everything came back resolved, or rewrite it with
-what is still open. If this change plainly is not those fixes, delete it and review
-normally ($CALL_WORD: $LENSES)."
+  DIRECTIVE="This is a verdict pass, not a new review: the last round's findings are in $FINDINGS
+and this change is the fix. Send ONE adversary with that file under a \"## Prior findings\"
+heading; afterwards delete the file if everything resolved, or rewrite it with what is open."
 else
-  DIRECTIVE="Delegate them to the \`adversary\` subagent (Agent tool, subagent_type: adversary),
-$CALL_WORD: $LENSES
-$PARALLEL Add contract-drift if this diff changed an exported signature, a return type or a
-public nullability — that is the one thing the line count above cannot see.
-
-When they report, write their findings to $FINDINGS. The next round scores that file
-instead of hunting again, and it has to outlive this session to do that."
+  DIRECTIVE="Lenses: $LENSES. Write the findings to $FINDINGS when they report."
   [ -f "$FINDINGS" ] && DIRECTIVE="$DIRECTIVE
-
-($FINDINGS is left over from an earlier round and does not describe this change —
-delete it, then review normally.)"
+($FINDINGS is left over from an earlier round and does not describe this change — delete it.)"
 fi
 
 # Anything the repo's own tooling already knows, so nobody spends a tool call finding it.
@@ -241,12 +222,14 @@ RANGE="git diff $BASE"
 git rev-parse --verify --quiet HEAD >/dev/null 2>&1 ||
   RANGE="(no commits yet, so there is no diff — the new files below are the whole change)"
 
-# The reviewer inherits the session's model unless told otherwise. Judging code with the model
-# that wrote it is a measured bias (self-preference), so the override is one variable away.
+# The reviewer runs on Haiku (agents/adversary.md) — cheap, and not the model that wrote the
+# code, which matters: self-preference in LLM judges is a measured bias. One variable overrides it.
 MODEL_LINE=""
 [ -n "${ADVERSARY_MODEL:-}" ] && MODEL_LINE="
-Spawn every reviewer with model: ${ADVERSARY_MODEL} (the Agent tool's model parameter), so the
-code is not judged by the model that wrote it."
+Spawn every reviewer with model: ${ADVERSARY_MODEL} (the Agent tool's model parameter)."
+# With the agy runner the reviewers are not Claude subagents at all, so the line above is moot.
+[ "${ADVERSARY_RUNNER:-}" = "agy" ] && MODEL_LINE="
+Runner: agy — the skill's agy path, not subagents."
 
 # Only now, with the message about to go out, record that this state was covered. Writing it
 # earlier means a hook killed in between (a slow mechanical check, a harness timeout) records
@@ -258,33 +241,15 @@ code is not judged by the model that wrote it."
 # by importance: what to do, then how to answer, then the off switch, and the optional linter
 # output last — it is the one block that can run long, and losing its tail costs nothing.
 cat >&2 <<MSG
-These changes have not been adversarially reviewed.
+Not adversarially reviewed yet. Run /adversarial-review:adversary run on exactly this diff:
+
+  $RANGE
+$([ -n "$NEW_FILES" ] && printf '\n  ...plus these new files, which no diff covers yet:\n%s\n' "$(printf '%s' "$NEW_FILES" | sed 's/^/    /')")
 
 $DIRECTIVE$MODEL_LINE
 
-Run this range ONCE yourself and paste the diff into every prompt under a
-"## The diff" heading — don't make the agents each fetch it. Start from exactly
-this, not from \`git diff HEAD\`; some of this work is already committed, so HEAD
-alone shows nothing:
-
-  $RANGE
-$([ -n "$NEW_FILES" ] && printf '\n  ...and these new files, which no diff covers yet:\n%s\n' "$(printf '%s' "$NEW_FILES" | sed 's/^/    /')")
-Do not review your own work yourself; that is the whole point.
-
-Each reviewer returns a verdict word — block, concerns or clean. Report the worst one
-verbatim; you do not get to soften it. Fix only what a reviewer marked confirmed; mention
-what it called plausible and leave it alone — a reviewer told to assume the code is wrong
-returns some findings that are not there, and a guard deleted on a plausible is a bug you
-introduced. Don't chase findings yourself and don't re-run the review after fixing: if the
-fixes change the tree, this hook fires again and asks for a scoring pass, not a new hunt.
-
-This hook interrupted the answer you were about to give, so write that answer now. Your
-last message is about the work that was asked for — what you did, what you found, what is
-left — and the review is a short block at the end of it: the verdict word, what you fixed,
-what you left open. The review is an aside about the work, not a replacement for it; a
-reply that is nothing but a review report leaves the user with no answer to what they asked.
-
-(To stop this: /adversarial-review:adversary off — or \`adversary off\` in a shell)
-$([ -n "$MECHANICAL" ] && printf '\nPaste this in too, under "## Already known mechanically", so nobody spends a\ntool call rediscovering it:\n\n%s\n' "$(printf '%s' "$MECHANICAL" | sed 's/^/    /')")
+Fix only confirmed findings, then finish the answer you were giving; the review is a short
+block at the end of it. (Off switch: /adversarial-review:adversary off)
+$([ -n "$MECHANICAL" ] && printf '\nHand this to the reviewers under "## Already known mechanically":\n\n%s\n' "$(printf '%s' "$MECHANICAL" | sed 's/^/    /')")
 MSG
 exit 2

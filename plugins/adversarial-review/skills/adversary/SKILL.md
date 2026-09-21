@@ -9,6 +9,8 @@ Adversarial review state right now:
 
 !`bash "${CLAUDE_PLUGIN_ROOT}/bin/adversary" status 2>/dev/null || echo "state: unknown (toggle not found)"`
 
+Reviewer runner: !`echo "${ADVERSARY_RUNNER:-subagent}"`
+
 The user invoked this with `$ARGUMENTS`. Run the toggle as
 `bash "${CLAUDE_PLUGIN_ROOT}/bin/adversary" <args>` — invoke it via `bash` rather than
 directly, since the file may not carry an exec bit after install.
@@ -28,18 +30,22 @@ directly, since the file may not carry an exec bit after install.
      | changed code lines | lenses |
      | --- | --- |
      | under 40 | ask whether it's worth a round at all |
-     | 40–150 | `correctness` |
-     | 150–600 | `correctness`, `failure-paths` |
-     | over 600, or 8+ files | all four: add `lifetime-and-async`, `contract-drift` |
+     | 40–600 | `correctness` |
+     | over 600, or 8+ files | `correctness`, `failure-paths` |
+     | only when asked (`run all`, or lenses named) | add `lifetime-and-async`, `contract-drift` |
 
      One thing the count can't see: if the diff changes an exported signature, a return type, or
      a public nullability, add `contract-drift` whatever the size. `$ARGUMENTS` naming lenses, or
      `ADVERSARY_LENSES`, overrides the ladder.
   2. **Capture the diff once.** Write it to a scratch file (the session scratchpad, or
      `$TMPDIR`) — `git diff HEAD`, or, if that is empty because the work is already committed,
-     the commits that are new (`git diff @{u}`, `git diff HEAD~1`, or the range the user names).
-     Paste its contents into every lens prompt under a `## The diff` heading. Do not make four
-     agents each fetch it.
+     the commits that are new (`git diff @{u}`, `git diff HEAD~1`, or the range the user or the
+     Stop hook names — the hook's range wins when it gave one).
+     Redirect it straight to the file (`git diff <range> > "$SCRATCH/adversary.diff"`) and do
+     not read it back: put only the file's **path** in each lens prompt under a `## The diff`
+     heading. Pasting the contents makes you re-emit the whole diff as output once per lens,
+     which is the most expensive way to move it; a reviewer's one Read of the file is the
+     cheapest.
   3. **Carry what is already known.** Two files, in two places, on purpose:
 
      - `adversary-facts.md`, next to the scratch diff — what earlier lenses *proved by running
@@ -55,6 +61,18 @@ directly, since the file may not carry an exec bit after install.
   4. **Fan out.** Spawn the chosen lenses in one message so they run in parallel (Agent tool,
      `subagent_type: adversary`). Name the scratch directory in each prompt; that is where their
      probe scripts go, not the repo.
+
+     **If the runner shown above is `agy`**, the reviewers are the Antigravity CLI instead, and
+     no subagent is spawned. One Bash call per lens, all in one message, each with a 360000 ms
+     timeout:
+
+         bash "${CLAUDE_PLUGIN_ROOT}/scripts/agy-review.sh" <lens> "$SCRATCH/adversary.diff" \
+           [--prior .git/adversary-findings.md] [--facts "$SCRATCH/adversary-facts.md"]
+
+     Its stdout is the lens's report, in the subagent's format — treat it identically from here
+     on. Exit 3 means agy was unusable (missing, timed out, no verdict): say so in one line and
+     run that lens as the `adversary` subagent instead. An agy reviewer cannot execute anything,
+     so its **Established by execution** section is always empty.
   5. **Synthesize.** Group the returned findings by file *and mechanism* — a race and an
      off-by-one at the same line are two findings, not one. A finding two or more lenses raised
      independently is **promoted one severity level** and labelled `corroborated`; agreement is
@@ -72,7 +90,8 @@ directly, since the file may not carry an exec bit after install.
      everything came back resolved. Nothing else clears it, and a findings file left behind
      turns the next unrelated change into a verdict pass against stale findings.
 
-  Each lens is capped at 22 turns and told to stop investigating at its 15th tool call, so this
+  Each lens runs on Haiku, is capped at 16 turns and told to stop investigating at its 12th tool
+  call, so this
   is one round and not an audit; let them finish and report, don't chase their findings further
   yourself. Fix nothing unless asked. For a heavier pass with refutation voting, use
   `/adversarial-review:review` instead.

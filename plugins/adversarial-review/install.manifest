@@ -19,9 +19,11 @@ bin    bin/adversary              hooks/adversary                  the on/off sw
 hook   SessionStart  scripts/session-base.sh       hooks/session-base.sh       anchors what counts as new
 hook   Stop          scripts/require-adversary.sh  hooks/require-adversary.sh  the Stop-hook nudge
 file   scripts/mechanical-pass.sh   hooks/mechanical-pass.sh   opt-in: runs your linters first
+file   scripts/agy-review.sh        hooks/agy-review.sh        opt-in: ADVERSARY_RUNNER=agy reviews with the Antigravity CLI
 
 # Outside the plugin system there is no ${CLAUDE_PLUGIN_ROOT} and no /plugin:skill namespace.
 rewrite  ${CLAUDE_PLUGIN_ROOT}/bin/adversary  @ROOT@/hooks/adversary
+rewrite  ${CLAUDE_PLUGIN_ROOT}/scripts/agy-review.sh  @ROOT@/hooks/agy-review.sh
 rewrite  /adversarial-review:adversary        /adversary
 rewrite  /adversarial-review:review           /adversarial-review
 
