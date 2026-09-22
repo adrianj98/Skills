@@ -249,7 +249,7 @@ $([ -n "$NEW_FILES" ] && printf '\n  ...plus these new files, which no diff cove
 $DIRECTIVE$MODEL_LINE
 
 Fix only confirmed findings, then finish the answer you were giving; the review is a short
-block at the end of it. If none of this diff is yours, skip the review and stop without a
+block at the end of it: one line if clean, one line per finding otherwise. If none of this diff is yours, skip the review and stop without a
 word: no message, no explanation. (Off switch: /adversarial-review:adversary off)
 $([ -n "$MECHANICAL" ] && printf '\nHand this to the reviewers under "## Already known mechanically":\n\n%s\n' "$(printf '%s' "$MECHANICAL" | sed 's/^/    /')")
 MSG

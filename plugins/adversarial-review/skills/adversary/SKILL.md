@@ -81,6 +81,10 @@ directly, since the file may not carry an exec bit after install.
      were wrong. So promotion moves severity only, never confidence: two `plausible`s stay
      `plausible`. Report the worst verdict word any lens returned, verbatim; you don't get to
      soften it.
+
+     Keep the report short. A clean verdict is one line. Otherwise give the verdict word, then
+     one line per finding (file:line, what breaks). Leave out the lenses, the process and
+     anything you checked that turned out fine.
   6. **Write both files back.** Append each lens's **Established by execution** lines to
      `adversary-facts.md`, one per line, with how it was verified — facts someone actually ran,
      nothing merely reasoned about. Write the synthesized findings to
