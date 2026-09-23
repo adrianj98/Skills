@@ -1,0 +1,10 @@
+{
+  "name": "doubt",
+  "displayName": "Doubt",
+  "version": "0.1.0",
+  "description": "Questions an analysis or diagnosis the AI gave: splits it into claims, checks the load-bearing ones in a fresh context, names the explanations it skipped, and says what holds, what's wrong and what was never verified.",
+  "author": { "name": "Adrian Jones", "url": "https://github.com/adrianj98" },
+  "repository": "https://github.com/adrianj98/skills",
+  "license": "MIT",
+  "keywords": ["diagnosis", "debugging", "verification", "root-cause", "skepticism", "quality"]
+}

@@ -81,6 +81,19 @@ It never edits anything.
 
 [Full README →](plugins/showmethedata/README.md)
 
+### [`doubt`](plugins/doubt) · v0.1.0
+
+`/doubt` — question the analysis or diagnosis the AI just gave, before you act on it. It
+splits the analysis into claims, checks the load-bearing ones in a fresh context that never
+saw the reasoning, and names the explanations it skipped. The first line of the report is
+**Holds**, **Shaky** or **Wrong**, and anything after it is only what failed or went unchecked.
+
+```bash
+claude plugin install doubt@adrianj98-skills
+```
+
+[Full README →](plugins/doubt/README.md)
+
 ## Installing without the plugin system
 
 `install.sh` copies a plugin's files into `~/.claude/` or a repo's `.claude/`, rewrites its

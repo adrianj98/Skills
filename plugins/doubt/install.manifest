@@ -1,0 +1,14 @@
+# What ../../install.sh copies when someone installs this plugin without the plugin system.
+# Verbs are documented in ../adversarial-review/install.manifest.
+
+name   Doubt
+about  Questions an analysis or diagnosis the AI gave and says what holds, what's wrong and what was never checked.
+
+file   skills/doubt/SKILL.md  skills/doubt/SKILL.md  /doubt
+
+# Outside the plugin system there is no /plugin:skill namespace.
+rewrite  /doubt:doubt  /doubt
+
+tip  /doubt                           the last analysis in this conversation
+tip  /doubt the race condition theory  one part of it
+tip  /doubt notes/postmortem.md        an analysis written to a file

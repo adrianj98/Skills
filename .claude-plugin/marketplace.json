@@ -54,6 +54,18 @@
       "license": "MIT",
       "keywords": ["data", "data-flow", "schema", "storage", "database", "tracing", "codebase-understanding"],
       "category": "development"
+    },
+    {
+      "name": "doubt",
+      "displayName": "Doubt",
+      "source": "./plugins/doubt",
+      "description": "Questions an analysis or diagnosis the AI gave: splits it into claims, checks the load-bearing ones in a fresh context, names the explanations it skipped, and says what holds, what's wrong and what was never verified.",
+      "version": "0.1.0",
+      "author": { "name": "Adrian Jones", "url": "https://github.com/adrianj98" },
+      "repository": "https://github.com/adrianj98/skills",
+      "license": "MIT",
+      "keywords": ["diagnosis", "debugging", "verification", "root-cause", "skepticism", "quality"],
+      "category": "development"
     }
   ]
 }
