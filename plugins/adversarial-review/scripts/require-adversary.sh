@@ -197,14 +197,13 @@ findings_live() {
   fi
 }
 
+# A leftover findings file would turn this review into a verdict pass against findings that
+# describe other code. Clear it here rather than asking the model to.
+MODE=""
 if findings_live; then
-  DIRECTIVE="This is a verdict pass, not a new review: the last round's findings are in $FINDINGS
-and this change is the fix. Send ONE adversary with that file under a \"## Prior findings\"
-heading; afterwards delete the file if everything resolved, or rewrite it with what is open."
+  MODE=" as a verdict pass on $FINDINGS"
 else
-  DIRECTIVE="Lenses: $LENSES. Write the findings to $FINDINGS when they report."
-  [ -f "$FINDINGS" ] && DIRECTIVE="$DIRECTIVE
-($FINDINGS is left over from an earlier round and does not describe this change — delete it.)"
+  rm -f "$FINDINGS"
 fi
 
 # Anything the repo's own tooling already knows, so nobody spends a tool call finding it.
@@ -217,19 +216,16 @@ do
   [ -f "$CANDIDATE" ] && { MECHANICAL="$(bash "$CANDIDATE" 2>/dev/null || true)"; break; }
 done
 
-RANGE="git diff $BASE"
-# A repo with no commits has nothing to diff against; the untracked list is the whole change.
-git rev-parse --verify --quiet HEAD >/dev/null 2>&1 ||
-  RANGE="(no commits yet, so there is no diff — the new files below are the whole change)"
+RANGE="git diff $(git rev-parse --short "$BASE" 2>/dev/null || echo "$BASE")"
+# A repo with no commits has nothing to diff against; the untracked files are the whole change.
+git rev-parse --verify --quiet HEAD >/dev/null 2>&1 || RANGE="the untracked files"
+NNEW="$(printf '%s' "$NEW_FILES" | grep -c '[^[:space:]]')"
+[ "$NNEW" -gt 0 ] && [ "$RANGE" != "the untracked files" ] && RANGE="$RANGE + $NNEW new file$([ "$NNEW" = 1 ] || echo s)"
 
-# The reviewer runs on Haiku (agents/adversary.md) — cheap, and not the model that wrote the
-# code, which matters: self-preference in LLM judges is a measured bias. One variable overrides it.
-MODEL_LINE=""
-[ -n "${ADVERSARY_MODEL:-}" ] && MODEL_LINE="
-Spawn every reviewer with model: ${ADVERSARY_MODEL} (the Agent tool's model parameter)."
-# With the agy runner the reviewers are not Claude subagents at all, so the line above is moot.
-[ "${ADVERSARY_RUNNER:-}" = "agy" ] && MODEL_LINE="
-Runner: agy — the skill's agy path, not subagents."
+# Lenses, runner and findings path are the skill's to work out; the nudge only names the diff.
+EXTRA=""
+[ -n "${ADVERSARY_MODEL:-}" ] && [ "${ADVERSARY_RUNNER:-}" != agy ] && EXTRA=" Reviewer model: ${ADVERSARY_MODEL}."
+[ "$LENSES" != "correctness" ] && [ "$LENSES" != "correctness, failure-paths" ] && EXTRA="$EXTRA Lenses: $LENSES."
 
 # Only now, with the message about to go out, record that this state was covered. Writing it
 # earlier means a hook killed in between (a slow mechanical check, a harness timeout) records
@@ -237,20 +233,11 @@ Runner: agy — the skill's agy path, not subagents."
 # Line 1 anchors the next review, line 2 says what this one covered.
 { git rev-parse HEAD 2>/dev/null || echo ""; printf '%s\n' "$HASH"; } > "$MARK"
 
-# Hook output is capped at 10,000 characters and truncated from the end, so the order below is
-# by importance: what to do, then how to answer, then the off switch, and the optional linter
-# output last — it is the one block that can run long, and losing its tail costs nothing.
+# Two lines: what to review and what to do. The optional linter output, if configured, goes last
+# (hook output is truncated from the end).
 cat >&2 <<MSG
-Not adversarially reviewed yet. Run /adversarial-review:adversary run on exactly this diff:
-
-  $RANGE
-$([ -n "$NEW_FILES" ] && printf '\n  ...plus these new files, which no diff covers yet:\n%s\n' "$(printf '%s' "$NEW_FILES" | sed 's/^/    /')")
-
-$DIRECTIVE$MODEL_LINE
-
-Fix only confirmed findings, then finish the answer you were giving; the review is a short
-block at the end of it: one line if clean, one line per finding otherwise. If none of this diff is yours, skip the review and stop without a
-word: no message, no explanation. (Off switch: /adversarial-review:adversary off)
-$([ -n "$MECHANICAL" ] && printf '\nHand this to the reviewers under "## Already known mechanically":\n\n%s\n' "$(printf '%s' "$MECHANICAL" | sed 's/^/    /')")
+Unreviewed: $RANGE. Run /adversarial-review:adversary run on it$MODE, fixing confirmed findings only; one line if clean.$EXTRA
+If none of it is yours, stop without a word. (Off: /adversarial-review:adversary off)
+$([ -n "$MECHANICAL" ] && printf 'Known mechanically, for the reviewers:\n%s\n' "$MECHANICAL")
 MSG
 exit 2
