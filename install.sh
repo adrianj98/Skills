@@ -6,6 +6,7 @@
 #   ./install.sh <plugin> --local           into ./.claude/   (this repo only)
 #   ./install.sh <plugin> --local PATH      into PATH/.claude/
 #   ./install.sh <plugin> --uninstall --global | --local [PATH]
+#   ./install.sh all --global               every plugin at once
 #   ./install.sh --list                     what's installable
 #
 # Works from a clone, or standalone over curl:
@@ -31,9 +32,11 @@ Install a plugin from this repo without the plugin system.
   install.sh <plugin> --local           into ./.claude/     (this repo, committed)
   install.sh <plugin> --local PATH      into PATH/.claude/
   install.sh <plugin> --uninstall --global | --local [PATH]
+  install.sh all --global               every plugin (also works with --uninstall)
   install.sh --list                     list the installable plugins
 
   --repo         alias for --local
+  --all          same as the plugin name `all`
   --plugin NAME  same as the positional <plugin>
   --dir PATH     unambiguous form of `--local PATH`
   --private      register hooks in settings.local.json (gitignored) instead
@@ -66,6 +69,7 @@ while [ $# -gt 0 ]; do
     --no-hook|--no-hooks) NO_HOOK=1 ;;
     --dry-run)   DRY=1 ;;
     --list|-l)   LIST=1 ;;
+    --all)       [ -z "$PLUGIN" ] || die "more than one plugin given: $PLUGIN, all"; PLUGIN=all ;;
     -h|--help)   usage; exit 0 ;;
     -*)          die "unknown option: $1 (try --help)" ;;
     *)           [ -z "$PLUGIN" ] || die "more than one plugin given: $PLUGIN, $1"; PLUGIN="$1" ;;
@@ -144,6 +148,29 @@ if [ -z "$PLUGIN" ]; then
   fi
 fi
 if [ -z "$SCOPE" ]; then usage >&2; die "pick a scope: --global or --local [PATH]"; fi
+
+# ---------- all ----------
+# Run this same script once per plugin, with the same flags.
+if [ "$PLUGIN" = all ]; then
+  if [ -n "$SELF" ] && [ -f "$SELF" ]; then ME="$SELF"
+  else ME="$TMP/install.sh"; fetch "$REPO_RAW/install.sh" "$ME" || die "could not download install.sh"; fi
+  FLAGS=()
+  if [ "$SCOPE" = global ]; then FLAGS+=(--global); else FLAGS+=(--dir "${DEST_ARG:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"); fi
+  [ "$SETTINGS_FILE" = settings.local.json ] && FLAGS+=(--private)
+  [ "$UNINSTALL" = 1 ] && FLAGS+=(--uninstall)
+  [ "$NO_HOOK" = 1 ] && FLAGS+=(--no-hook)
+  [ "$DRY" = 1 ] && FLAGS+=(--dry-run)
+  failed=""
+  while IFS= read -r p; do
+    [ -n "$p" ] || continue
+    SKILLS_RAW="$REPO_RAW" bash "$ME" --plugin "$p" "${FLAGS[@]}" || failed="$failed $p"
+    say ""
+  done <<EOL
+$(available)
+EOL
+  [ -z "$failed" ] || die "failed:$failed"
+  exit 0
+fi
 
 # ---------- destination ----------
 if [ "$SCOPE" = global ]; then

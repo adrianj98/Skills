@@ -109,6 +109,7 @@ curl -fsSL https://raw.githubusercontent.com/adrianj98/Skills/main/install.sh \
 # this repo, committed for teammates
 ./install.sh adversarial-review --local
 
+./install.sh all --global                             every plugin at once
 ./install.sh --list                                   what's installable
 ./install.sh adversarial-review --uninstall --global  reverse it
 ```
