@@ -5,7 +5,7 @@ argument-hint: "[since WHEN] [everyone]"
 allowed-tools: Bash, mcp__claude_ai_Atlassian_Rovo__searchJiraIssuesUsingJql, mcp__claude_ai_Atlassian_Rovo__getAccessibleAtlassianResources
 ---
 
-Since yesterday morning: commits across every worktree of this repo (branch, time, sha, subject), your GitHub PRs, and what each worktree's aj-log.md gained:
+Since yesterday morning: commits across every worktree of this repo (branch, time, sha, subject, then the message body indented), your GitHub PRs, and what each worktree's aj-log.md gained:
 
 !`bash "${CLAUDE_PLUGIN_ROOT}/scripts/standup.sh" 2>&1`
 
@@ -27,6 +27,8 @@ Turn all of it into a standup list:
   its tests, the same change landing on two branches, the PR it went out in, the Jira issue it
   closes and the aj-log.md entry about it: one bullet. Put the Jira key or PR number at the end
   when there is one (`— ALD-123`, `— #412`).
+- **Read the commit bodies** — they say what the change was for; a vague subject ("fix",
+  "update") usually has the real story in its body.
 - **aj-log.md is context, not a source of bullets on its own** — use it to say *why*, or to
   catch work that isn't committed yet. Only entries dated after the cutoff count.
 - **Reviews and Jira-only moves count** — "reviewed Sam's retry PR", "picked up ALD-130".

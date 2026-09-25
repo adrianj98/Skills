@@ -69,6 +69,9 @@ fi
 echo "since     $CUTOFF$([ "$EVERYONE" = 1 ] && echo '  (everyone)' || echo '  (your commits)')"
 echo
 
+# The full message, not just the subject: the body is where the why is. Body lines are
+# indented under their subject; blank lines and Co-Authored-By trailers are dropped.
+#
 # Label each commit with the nearest branch that contains it (main~3 -> main). Not
 # `log --source`: that credits a shared commit to whichever tip the walk reached first,
 # which is usually the newest worktree, not the branch the work landed on. A commit no
@@ -77,10 +80,11 @@ TAB="$(printf '\t')"
 # Captured, not piped to `grep -q`: under pipefail its early exit SIGPIPEs git and the test fails.
 case "$(git name-rev -h 2>&1)" in *--annotate-stdin*) STDIN_FLAG=--annotate-stdin ;; *) STDIN_FLAG=--stdin ;; esac
 LOG="$(git log "${TIPS[@]}" ${AUTHOR[@]+"${AUTHOR[@]}"} --no-merges --since="@$EPOCH" --reverse \
-  --date=format-local:'%a %H:%M' --format='%H%x09%ad%x09%h%x09%s' |
+  --date=format-local:'%a %H:%M' --format='%H%x09%ad%x09%h%x09%s%n%w(0,4,4)%b' |
   git name-rev "$STDIN_FLAG" --name-only --refs='refs/heads/*' |
   sed -e "s|^\([0-9a-f]\{7\}\)[0-9a-f]\{33\}$TAB|detached \1$TAB|" \
-      -e "s|^\([^$TAB~^]*\)[~^][^$TAB]*$TAB|\1$TAB|")"
+      -e "s|^\([^$TAB~^]*\)[~^][^$TAB]*$TAB|\1$TAB|" |
+  grep -v '^[[:space:]]*$' | grep -iv '^[[:space:]]*co-authored-by:')"
 if [ -n "$LOG" ]; then printf '%s\n' "$LOG"; else echo "(no commits)"; fi
 
 # ---------- GitHub PRs ----------
