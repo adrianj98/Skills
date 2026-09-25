@@ -31,8 +31,13 @@ Turn all of it into a standup list:
   the Jira issue it closes, and the aj-log.md entry about it.
 - **Under about 12 words each**, past tense, saying what changed, not how. No lists of
   sub-features. No shas, times, branch names or file paths.
-- **End each bullet with its keys** (`— AL-123, #412`). Add `(draft)` or `in progress` if
-  the work isn't merged yet.
+- **Each key appears once.** When every bullet in a group shares a Jira issue or PR, put
+  its key on the heading (`**LLM Insights** — AL-3706, #2726`). Otherwise end a bullet with a
+  key the first time that key comes up, and leave it off later bullets. Add `(draft)` or
+  `in progress` on the first mention if the work isn't merged yet.
+- **A PR or issue has to have moved.** Only list it if you committed to it, opened, merged
+  or reviewed it, or changed its status since the cutoff. An open PR that only shows up
+  because a bot, CI or a comment bumped its updated time doesn't count.
 - **Only your own work.** Other people's squash-merged PRs that show up on your branches
   don't count. Reviews and Jira-only moves do: "reviewed Sam's retry PR", "picked up AL-130".
 - **Read the commit bodies.** They say what a change was for. A vague subject ("fix",
