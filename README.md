@@ -36,7 +36,10 @@ Ships four levels of the same idea, escalating by how hard it is to skip:
 
 `/standup` — a very short list of what you worked on since yesterday morning. It reads the
 commits reachable from every worktree of the current repo, so work on a branch checked out
-somewhere else still counts, and folds related commits into one bullet each.
+somewhere else still counts. It also reads the GitHub PRs you opened or reviewed (through `gh`),
+the Jira issues you touched (through an Atlassian MCP server or a `jira`/`acli` CLI), and
+whatever each worktree's `aj-log.md` gained. Related items become one bullet each. A source
+that isn't available is skipped.
 
 ```bash
 claude plugin install standup@adrianj98-skills

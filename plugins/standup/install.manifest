@@ -2,10 +2,10 @@
 # Verbs are documented in ../adversarial-review/install.manifest.
 
 name   Standup
-about  A very short list of what you worked on since yesterday morning, across every worktree.
+about  A very short list of what you worked on since yesterday morning: commits, PRs, Jira, aj-log.md.
 
 file   skills/standup/SKILL.md  skills/standup/SKILL.md    /standup
-file   scripts/standup.sh       skills/standup/standup.sh  gathers the commits
+file   scripts/standup.sh       skills/standup/standup.sh  gathers commits, PRs and aj-log.md
 
 # Outside the plugin system there is no ${CLAUDE_PLUGIN_ROOT} and no /plugin:skill namespace.
 rewrite  ${CLAUDE_PLUGIN_ROOT}/scripts/standup.sh  @ROOT@/skills/standup/standup.sh

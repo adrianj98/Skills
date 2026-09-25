@@ -23,7 +23,7 @@
       "name": "standup",
       "displayName": "Standup",
       "source": "./plugins/standup",
-      "description": "A very short list of what you worked on since yesterday morning, from the commits in every worktree of the current repo.",
+      "description": "A very short list of what you worked on since yesterday morning, from the commits in every worktree of the current repo, your GitHub PRs, your Jira issues and any aj-log.md.",
       "version": "0.1.0",
       "author": { "name": "Adrian Jones", "url": "https://github.com/adrianj98" },
       "repository": "https://github.com/adrianj98/skills",
