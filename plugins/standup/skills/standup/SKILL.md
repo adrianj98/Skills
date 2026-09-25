@@ -23,18 +23,24 @@ fails, skip Jira without mentioning it.
 
 Turn all of it into a standup list:
 
-- **One bullet per piece of work, not per commit.** A fix and its follow-ups, a feature and
-  its tests, the same change landing on two branches, the PR it went out in, the Jira issue it
-  closes and the aj-log.md entry about it: one bullet. Put the Jira key or PR number at the end
-  when there is one (`— ALD-123`, `— #412`).
-- **Read the commit bodies** — they say what the change was for; a vague subject ("fix",
+- **Grouped by project or page.** Put a bold heading over each group (`**LLM Insights**`,
+  `**Workflow page**`). Group by what the work is for, not by ticket. Anything that fits no
+  group goes under `**Other**`.
+- **One bullet per piece of work, not per commit.** These all make one bullet: a fix and its
+  follow-ups, a feature and its tests, the same change on two branches, the PR it went out in,
+  the Jira issue it closes, and the aj-log.md entry about it.
+- **Under about 12 words each**, past tense, saying what changed, not how. No lists of
+  sub-features. No shas, times, branch names or file paths.
+- **End each bullet with its keys** (`— AL-123, #412`). Add `(draft)` or `in progress` if
+  the work isn't merged yet.
+- **Only your own work.** Other people's squash-merged PRs that show up on your branches
+  don't count. Reviews and Jira-only moves do: "reviewed Sam's retry PR", "picked up AL-130".
+- **Read the commit bodies.** They say what a change was for. A vague subject ("fix",
   "update") usually has the real story in its body.
-- **aj-log.md is context, not a source of bullets on its own** — use it to say *why*, or to
+- **Use aj-log.md for context, not as a source of bullets.** Use it to say *why*, or to
   catch work that isn't committed yet. Only entries dated after the cutoff count.
-- **Reviews and Jira-only moves count** — "reviewed Sam's retry PR", "picked up ALD-130".
-- **A few plain words each**, past tense, the way you'd say it out loud. No shas, times,
-  branch names, or file paths.
-- **Drop the noise** — typo fixes, formatting, version bumps, "wip" — unless that's all there is.
-- **Nothing but the list.** No heading, no intro, no summary after.
+- **Drop the noise** — typo fixes, formatting, version bumps, "wip" — unless that's all
+  there is.
+- **Nothing but the grouped list.** No title, intro or closing summary.
 
 If there's nothing at all, say so in one line with the cutoff date, e.g. `Nothing since Mon Sep 14 06:00.`
