@@ -1,0 +1,10 @@
+{
+  "name": "caveman",
+  "displayName": "Caveman",
+  "version": "0.1.0",
+  "description": "Light caveman mode: short, plain, filler-free replies for the rest of the session. Code, errors and technical terms stay exact; warnings stay in full sentences.",
+  "author": { "name": "Adrian Jones", "url": "https://github.com/adrianj98" },
+  "repository": "https://github.com/adrianj98/skills",
+  "license": "MIT",
+  "keywords": ["terse", "tokens", "brevity", "caveman", "output"]
+}

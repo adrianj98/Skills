@@ -66,6 +66,18 @@
       "license": "MIT",
       "keywords": ["diagnosis", "debugging", "verification", "root-cause", "skepticism", "quality"],
       "category": "development"
+    },
+    {
+      "name": "caveman",
+      "displayName": "Caveman",
+      "source": "./plugins/caveman",
+      "description": "Light caveman mode: short, plain, filler-free replies for the rest of the session. Code, errors and technical terms stay exact; warnings stay in full sentences.",
+      "version": "0.1.0",
+      "author": { "name": "Adrian Jones", "url": "https://github.com/adrianj98" },
+      "repository": "https://github.com/adrianj98/skills",
+      "license": "MIT",
+      "keywords": ["terse", "tokens", "brevity", "caveman", "output"],
+      "category": "productivity"
     }
   ]
 }

@@ -97,6 +97,18 @@ claude plugin install doubt@adrianj98-skills
 
 [Full README →](plugins/doubt/README.md)
 
+### [`caveman`](plugins/caveman) · v0.1.0
+
+`/caveman` — short, plain replies for the rest of the session, with no pleasantries, hedging
+or recap and the answer first. Code, errors and technical names stay exact, and warnings stay
+in full sentences. `/caveman off` turns it back.
+
+```bash
+claude plugin install caveman@adrianj98-skills
+```
+
+[Full README →](plugins/caveman/README.md)
+
 ## Installing without the plugin system
 
 `install.sh` copies a plugin's files into `~/.claude/` or a repo's `.claude/`, rewrites its

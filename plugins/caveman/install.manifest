@@ -1,0 +1,12 @@
+# What ../../install.sh copies when someone installs this plugin without the plugin system.
+# Verbs are documented in ../adversarial-review/install.manifest.
+
+name   Caveman
+about  Light caveman mode: short, plain, filler-free replies. Code and errors stay exact.
+
+file   skills/caveman/SKILL.md  skills/caveman/SKILL.md  /caveman
+
+rewrite  /caveman:caveman  /caveman
+
+tip  /caveman       short replies from here on
+tip  /caveman off   back to normal
