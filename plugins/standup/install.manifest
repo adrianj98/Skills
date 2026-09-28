@@ -2,7 +2,7 @@
 # Verbs are documented in ../adversarial-review/install.manifest.
 
 name   Standup
-about  A very short list of what you worked on since yesterday morning: commits, PRs, Jira, aj-log.md.
+about  A very short list of what you worked on since your last working day: commits, PRs, Jira, aj-log.md.
 
 file   skills/standup/SKILL.md  skills/standup/SKILL.md    /standup
 file   scripts/standup.sh       skills/standup/standup.sh  gathers commits, PRs and aj-log.md
@@ -11,6 +11,6 @@ file   scripts/standup.sh       skills/standup/standup.sh  gathers commits, PRs 
 rewrite  ${CLAUDE_PLUGIN_ROOT}/scripts/standup.sh  @ROOT@/skills/standup/standup.sh
 rewrite  /standup:standup                          /standup
 
-tip  /standup                  since yesterday morning, your commits
+tip  /standup                  since your last working day, your commits
 tip  /standup since friday     a longer window
 tip  /standup everyone         every author, not just you

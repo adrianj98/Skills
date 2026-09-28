@@ -1,11 +1,11 @@
 ---
 name: standup
-description: Write a very short standup list of what was worked on since yesterday morning, from the commits in every worktree of the current repo, your GitHub PRs, your Jira issues, and any aj-log.md in those worktrees. Use when the user asks for a standup, a daily update, or what they worked on yesterday.
+description: Write a very short standup list of what was worked on since your last working day, from the commits in every worktree of the current repo, your GitHub PRs, your Jira issues, and any aj-log.md in those worktrees. Use when the user asks for a standup, a daily update, or what they worked on yesterday.
 argument-hint: "[since WHEN] [everyone]"
 allowed-tools: Bash, mcp__claude_ai_Atlassian_Rovo__searchJiraIssuesUsingJql, mcp__claude_ai_Atlassian_Rovo__getAccessibleAtlassianResources
 ---
 
-Since yesterday morning: commits across every worktree of this repo (branch, time, sha, subject, then the message body indented), your GitHub PRs, and what each worktree's aj-log.md gained:
+Since the start of your last working day: commits across every worktree of this repo (branch, time, sha, subject, then the message body indented), your GitHub PRs, and what each worktree's aj-log.md gained:
 
 !`bash "${CLAUDE_PLUGIN_ROOT}/scripts/standup.sh" 2>&1`
 

@@ -2,7 +2,7 @@
 # Every commit reachable from any worktree of this repo since a cutoff, oldest first, then
 # your GitHub PRs touched since then and what each worktree's aj-log.md gained.
 #
-#   standup.sh                      since yesterday 06:00, your commits only
+#   standup.sh                      since the start of your last working day, your commits only
 #   standup.sh --since "friday 6am" any git date: "3 days ago", "2026-09-01", ...
 #   standup.sh --everyone           every author, not just you
 #
@@ -10,7 +10,7 @@
 # them all and lists a commit once, however many worktrees can reach it.
 set -uo pipefail
 
-SINCE="yesterday 06:00"; EVERYONE=0
+SINCE=""; EVERYONE=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --since)    [ -n "${2:-}" ] || { echo "--since needs a date" >&2; exit 2; }; SINCE="$2"; shift ;;
@@ -24,12 +24,6 @@ done
 
 git rev-parse --git-dir >/dev/null 2>&1 || { echo "not inside a git repository"; exit 0; }
 
-# git parses the date itself; ask it for the epoch so the cutoff printed is the one it used.
-EPOCH="$(git rev-parse --since="$SINCE" 2>/dev/null | sed -n 's/^--max-age=//p')"
-[ -n "$EPOCH" ] || { echo "could not read a date from: $SINCE" >&2; exit 2; }
-fmt() { date -r "$EPOCH" "$1" 2>/dev/null || date -d "@$EPOCH" "$1"; }
-CUTOFF="$(fmt '+%a %b %d %H:%M')"
-DAY="$(fmt '+%Y-%m-%d')"
 
 # One tip per worktree: its branch when it has one, so %S below names the branch, else the
 # detached sha. Bash 3.2 (macOS) has no mapfile, and an empty array trips `set -u`, hence
@@ -65,6 +59,24 @@ if [ "$EVERYONE" = 0 ]; then
   [ -n "$NAME" ]  && AUTHOR+=("--author=$(esc "$NAME")")
   [ -n "$EMAIL" ] && AUTHOR+=("--author=$(esc "$EMAIL")")
 fi
+
+# No --since: start of the last day before today you committed anything, so a Monday standup
+# covers Friday and the day after a holiday covers the day before it. Nothing in the last two
+# weeks: the previous weekday.
+if [ -z "$SINCE" ]; then
+  LAST="$(git log "${TIPS[@]}" ${AUTHOR[@]+"${AUTHOR[@]}"} --no-merges --since="14 days ago" \
+            --until="today 00:00" --date=format-local:%Y-%m-%d --format=%ad 2>/dev/null | sort -r | head -1)"
+  if [ -n "$LAST" ]; then SINCE="$LAST 00:00"
+  else case "$(date +%u)" in 1) SINCE="3 days ago 00:00" ;; 7) SINCE="2 days ago 00:00" ;; *) SINCE="yesterday 00:00" ;; esac
+  fi
+fi
+
+# git parses the date itself; ask it for the epoch so the cutoff printed is the one it used.
+EPOCH="$(git rev-parse --since="$SINCE" 2>/dev/null | sed -n 's/^--max-age=//p')"
+[ -n "$EPOCH" ] || { echo "could not read a date from: $SINCE" >&2; exit 2; }
+fmt() { date -r "$EPOCH" "$1" 2>/dev/null || date -d "@$EPOCH" "$1"; }
+CUTOFF="$(fmt '+%a %b %d %H:%M')"
+DAY="$(fmt '+%Y-%m-%d')"
 
 echo "since     $CUTOFF$([ "$EVERYONE" = 1 ] && echo '  (everyone)' || echo '  (your commits)')"
 echo

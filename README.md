@@ -34,7 +34,7 @@ Ships four levels of the same idea, escalating by how hard it is to skip:
 
 ### [`standup`](plugins/standup) · v0.1.0
 
-`/standup` — a very short list of what you worked on since yesterday morning. It reads the
+`/standup` — a very short list of what you worked on since your last working day. It reads the
 commits reachable from every worktree of the current repo, so work on a branch checked out
 somewhere else still counts. It also reads the GitHub PRs you opened or reviewed (through `gh`),
 the Jira issues you touched (through an Atlassian MCP server or a `jira`/`acli` CLI), and
