@@ -192,7 +192,11 @@ if [ "$SCOPE" = devin ]; then
     run "devin plugins remove '$PLUGIN' --yes" || die "devin could not remove $PLUGIN"
   else
     say "Installing $PLUGIN into Devin from $DEVIN_SOURCE"
-    run "devin plugins install '$DEVIN_SOURCE#plugins/$PLUGIN' --yes" || die "devin could not install $PLUGIN"
+    # devin exits 0 when the plugin landed on this machine but never reached Devin Cloud.
+    run "devin plugins install '$DEVIN_SOURCE#plugins/$PLUGIN' --yes 2>&1 | tee '$TMP/devin.out'" \
+      || die "devin could not install $PLUGIN"
+    grep -q 'not synced' "$TMP/devin.out" 2>/dev/null \
+      && die "$PLUGIN is on this machine only: Devin Cloud did not take it"
   fi
   exit 0
 fi
