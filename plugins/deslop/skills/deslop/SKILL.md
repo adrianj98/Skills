@@ -9,6 +9,10 @@ Mechanical scan of what changed, already run:
 
 !`bash "${CLAUDE_PLUGIN_ROOT}/scripts/scan.sh" 2>&1`
 
+If that line is still a command rather than its output, this host (Devin, for one) neither
+runs it nor sets `${CLAUDE_PLUGIN_ROOT}`. The plugin root is two directories above this
+skill's base directory: run `scripts/scan.sh` from there with `bash`.
+
 The user invoked this with `$ARGUMENTS`.
 
 - **no argument** — report only, on the scan above.

@@ -7,6 +7,7 @@
 #   ./install.sh <plugin> --local PATH      into PATH/.claude/
 #   ./install.sh <plugin> --uninstall --global | --local [PATH]
 #   ./install.sh all --global               every plugin at once
+#   ./install.sh <plugin> --devin           into Devin, through `devin plugins install`
 #   ./install.sh --list                     what's installable
 #
 # Works from a clone, or standalone over curl:
@@ -20,6 +21,8 @@ set -uo pipefail
 
 # Override to install from a fork or a branch: SKILLS_RAW=https://raw.githubusercontent.com/you/Skills/dev
 REPO_RAW="${SKILLS_RAW:-https://raw.githubusercontent.com/adrianj98/Skills/main}"
+# What `--devin` hands to `devin plugins install`: a GitHub owner/repo or a git URL.
+DEVIN_SOURCE="${SKILLS_DEVIN_SOURCE:-adrianj98/Skills}"
 
 PLUGIN=""; SCOPE=""; DEST_ARG=""; UNINSTALL=0; NO_HOOK=0; DRY=0; LIST=0
 SETTINGS_FILE="settings.json"
@@ -33,6 +36,8 @@ Install a plugin from this repo without the plugin system.
   install.sh <plugin> --local PATH      into PATH/.claude/
   install.sh <plugin> --uninstall --global | --local [PATH]
   install.sh all --global               every plugin (also works with --uninstall)
+  install.sh <plugin> --devin           into Devin: your personal plugins, which Devin
+                                        Cloud sessions and every signed-in machine load
   install.sh --list                     list the installable plugins
 
   --repo         alias for --local
@@ -58,6 +63,7 @@ run() { if [ "$DRY" = 1 ]; then printf '  [dry-run] %s\n' "$*"; else eval "$@"; 
 while [ $# -gt 0 ]; do
   case "$1" in
     --global)    SCOPE=global ;;
+    --devin)     SCOPE=devin ;;
     # `--local PATH` takes an optional path, but only swallows the next argument when it
     # is a directory that exists — otherwise that argument is the plugin name. `--dir` is
     # the unambiguous form.
@@ -147,7 +153,7 @@ if [ -z "$PLUGIN" ]; then
     die "pick a plugin"
   fi
 fi
-if [ -z "$SCOPE" ]; then usage >&2; die "pick a scope: --global or --local [PATH]"; fi
+if [ -z "$SCOPE" ]; then usage >&2; die "pick a scope: --global, --local [PATH] or --devin"; fi
 
 # ---------- all ----------
 # Run this same script once per plugin, with the same flags.
@@ -155,7 +161,7 @@ if [ "$PLUGIN" = all ]; then
   if [ -n "$SELF" ] && [ -f "$SELF" ]; then ME="$SELF"
   else ME="$TMP/install.sh"; fetch "$REPO_RAW/install.sh" "$ME" || die "could not download install.sh"; fi
   FLAGS=()
-  if [ "$SCOPE" = global ]; then FLAGS+=(--global); else FLAGS+=(--dir "${DEST_ARG:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"); fi
+  if [ "$SCOPE" = global ]; then FLAGS+=(--global); elif [ "$SCOPE" = devin ]; then FLAGS+=(--devin); else FLAGS+=(--dir "${DEST_ARG:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"); fi
   [ "$SETTINGS_FILE" = settings.local.json ] && FLAGS+=(--private)
   [ "$UNINSTALL" = 1 ] && FLAGS+=(--uninstall)
   [ "$NO_HOOK" = 1 ] && FLAGS+=(--no-hook)
@@ -169,6 +175,25 @@ if [ "$PLUGIN" = all ]; then
 $(available)
 EOL
   [ -z "$failed" ] || die "failed:$failed"
+  exit 0
+fi
+
+# ---------- devin ----------
+# Devin reads the plugin's .claude-plugin/plugin.json as it is, so there is nothing to copy
+# or rewrite: its own plugin system fetches the plugin from git and records it in your
+# personal plugins, which is what a Devin Cloud session loads.
+if [ "$SCOPE" = devin ]; then
+  command -v devin >/dev/null 2>&1 || die "the devin CLI is not on PATH"
+  if [ -n "$LOCAL_PLUGINS" ]; then [ -f "$LOCAL_PLUGINS/$PLUGIN/.claude-plugin/plugin.json" ]
+  else fetch "$REPO_RAW/plugins/$PLUGIN/.claude-plugin/plugin.json" "$TMP/plugin.json" 2>/dev/null; fi \
+    || { say "Skipping $PLUGIN: not a plugin, so Devin has nothing to install"; exit 0; }
+  if [ "$UNINSTALL" = 1 ]; then
+    say "Removing $PLUGIN from Devin"
+    run "devin plugins remove '$PLUGIN' --yes" || die "devin could not remove $PLUGIN"
+  else
+    say "Installing $PLUGIN into Devin from $DEVIN_SOURCE"
+    run "devin plugins install '$DEVIN_SOURCE#plugins/$PLUGIN' --yes" || die "devin could not install $PLUGIN"
+  fi
   exit 0
 fi
 

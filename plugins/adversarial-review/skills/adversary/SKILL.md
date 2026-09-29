@@ -11,6 +11,12 @@ Adversarial review state right now:
 
 Reviewer runner: !`echo "${ADVERSARY_RUNNER:-subagent}"`
 
+If those two lines are still commands rather than their output, this host (Devin, for one)
+neither runs them nor sets `${CLAUDE_PLUGIN_ROOT}`. The plugin root is two directories above
+this skill's base directory: run `bin/adversary status` from there with `bash`, read
+`$ADVERSARY_RUNNER` yourself, and use that path wherever `${CLAUDE_PLUGIN_ROOT}` appears
+below. The reviewer subagent is named `adversarial-review:adversary` there.
+
 The user invoked this with `$ARGUMENTS`. Run the toggle as
 `bash "${CLAUDE_PLUGIN_ROOT}/bin/adversary" <args>` — invoke it via `bash` rather than
 directly, since the file may not carry an exec bit after install.

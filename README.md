@@ -140,10 +140,26 @@ starter `CLAUDE.local.md` — personal notes for Claude, uncommitted:
 It lands beside the repo rather than in `.claude/`, adds itself to `.git/info/exclude`
 rather than the tracked `.gitignore`, and is never overwritten or deleted once it's yours.
 
+### Into Devin
+
+Devin reads these plugins as they are, so `--devin` hands each one to Devin's own plugin
+system instead of copying files:
+
+```bash
+./install.sh all --devin                  # or one plugin by name
+./install.sh standup --devin --uninstall
+```
+
+That records them in your personal plugins, which Devin Cloud sessions and every machine
+you sign in to load. Skills arrive namespaced (`/standup:standup`). The hooks and the
+`adversary` subagent only run in local Devin sessions, and the review workflow is Claude
+Code only. `SKILLS_DEVIN_SOURCE=you/Skills` installs from a fork.
+
 | | |
 |---|---|
 | `--global` | into `~/.claude/` (or `$CLAUDE_CONFIG_DIR`) |
 | `--local [PATH]` | into `./.claude/`, or `PATH/.claude/` — `--repo` is an alias |
+| `--devin` | into Devin, through `devin plugins install` |
 | `--private` | register hooks in `settings.local.json` (gitignored) instead |
 | `--no-hook` | skip any hooks; install everything else |
 | `--dry-run` | print what would happen, change nothing |

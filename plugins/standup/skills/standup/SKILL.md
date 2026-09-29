@@ -9,6 +9,11 @@ Since the start of your last working day: commits across every worktree of this 
 
 !`bash "${CLAUDE_PLUGIN_ROOT}/scripts/standup.sh" 2>&1`
 
+If that line is still a command rather than its output, this host (Devin, for one) neither
+runs it nor sets `${CLAUDE_PLUGIN_ROOT}`. The plugin root is two directories above this
+skill's base directory: run `scripts/standup.sh` from there with `bash`, and use that path
+wherever `${CLAUDE_PLUGIN_ROOT}` appears below.
+
 The user invoked this with `$ARGUMENTS`. If that asks for a different window ("since friday",
 "last 3 days") or for everyone's commits, rerun
 `bash "${CLAUDE_PLUGIN_ROOT}/scripts/standup.sh" --since "<when>"` and/or `--everyone`
