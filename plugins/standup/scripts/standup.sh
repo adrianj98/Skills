@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Every commit reachable from any worktree of this repo since a cutoff, oldest first, then
-# your GitHub PRs touched since then and what each worktree's aj-log.md gained.
+# your GitHub PRs touched since then and what the shared .git/aj-log.md and each worktree's aj-log.md gained.
 #
 #   standup.sh                      since the start of your last working day, your commits only
 #   standup.sh --since "friday 6am" any git date: "3 days ago", "2026-09-01", ...
