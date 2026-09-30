@@ -1,6 +1,6 @@
 ---
 name: standup
-description: Write a very short standup list of what was worked on since your last working day, from the commits in every worktree of the current repo, your GitHub PRs, your Jira issues, and any aj-log.md in those worktrees. Use when the user asks for a standup, a daily update, or what they worked on yesterday.
+description: Write a very short standup list of what was worked on since your last working day, from the commits in every worktree of the current repo, your GitHub PRs, your Jira issues, and any aj-log.md in those worktrees or the shared .git/ directory. Use when the user asks for a standup, a daily update, or what they worked on yesterday.
 argument-hint: "[since WHEN] [everyone]"
 allowed-tools: Bash, mcp__claude_ai_Atlassian_Rovo__searchJiraIssuesUsingJql, mcp__claude_ai_Atlassian_Rovo__getAccessibleAtlassianResources
 ---

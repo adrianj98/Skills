@@ -118,19 +118,21 @@ else
 fi
 
 # ---------- aj-log.md ----------
-# A worktree's running log of changes and why. Only what was added since the cutoff: from
-# git when the file is tracked, otherwise the tail of a file that was touched since then.
+# A running log of changes and why: one in .git/ that every worktree shares, plus any in a
+# worktree itself. Only what was added since the cutoff: from git when the file is tracked,
+# otherwise the tail of a file that was touched since then.
 echo
 echo "== aj-log.md"
 found=0
-for wt in ${WTS[@]+"${WTS[@]}"}; do
+COMMON="$(git rev-parse --path-format=absolute --git-common-dir)"
+for wt in "$COMMON" ${WTS[@]+"${WTS[@]}"}; do
   f="$wt/aj-log.md"
   [ -f "$f" ] || continue
   m="$(stat -f %m "$f" 2>/dev/null || stat -c %Y "$f")"
   [ "$m" -ge "$EPOCH" ] || continue
   found=1
   echo "-- $f"
-  if git -C "$wt" ls-files --error-unmatch aj-log.md >/dev/null 2>&1; then
+  if [ "$wt" != "$COMMON" ] && git -C "$wt" ls-files --error-unmatch aj-log.md >/dev/null 2>&1; then
     { git -C "$wt" log --since="@$EPOCH" --reverse -p --format= -- aj-log.md
       git -C "$wt" diff HEAD -- aj-log.md; } | grep '^+' | grep -v '^+++' | sed 's/^+//'
   else
