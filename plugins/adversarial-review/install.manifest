@@ -6,6 +6,10 @@
 #   bin   <src> <dest> <description>    same, plus the exec bit
 #   hook  <Event> <src> <dest> <desc>   same, and register it under hooks.<Event>
 #   rewrite <from> <to>                 applied to every installed file; @ROOT@ = install root
+#   remote <owner/repo[@ref]> <path> <dest> <description>
+#                                       copy <path> from that GitHub repo into <install root>/<dest>;
+#                                       <path>/* means each directory under it, as <dest>/<name>.
+#                                       install.sh --skill NAME picks one; --list shows them
 #   tip   <line>                        printed at the end of a successful install
 #   note  <line>                        printed at the end of an uninstall
 

@@ -140,6 +140,25 @@ starter `CLAUDE.local.md` — personal notes for Claude, uncommitted:
 It lands beside the repo rather than in `.claude/`, adds itself to `.git/info/exclude`
 rather than the tracked `.gitignore`, and is never overwritten or deleted once it's yours.
 
+### Skills from other repos
+
+A manifest can also pull skills straight from someone else's GitHub repo with a `remote`
+line. [`superpowers`](plugins/superpowers/install.manifest) installs
+[obra/superpowers](https://github.com/obra/superpowers) that way — all of it, or just the
+skills you name:
+
+```bash
+./install.sh superpowers --global                                    # every skill
+./install.sh superpowers --skill brainstorming,systematic-debugging --global
+./install.sh superpowers --list                                      # what there is to pick
+./install.sh superpowers --uninstall --skill brainstorming --global
+```
+
+It downloads one tarball per repo (no git, no API token), copies each skill directory into
+`skills/`, and rewrites `superpowers:<skill>` references to the bare `/<skill>` names.
+What it installed is recorded in `.claude/.install-receipts/<plugin>`, so `--uninstall`
+removes exactly that even after upstream adds or drops skills.
+
 ### Into Devin
 
 Devin reads these plugins as they are, so `--devin` hands each one to Devin's own plugin
@@ -163,6 +182,7 @@ Code only. `SKILLS_DEVIN_SOURCE=you/Skills` installs from a fork.
 | `--private` | register hooks in `settings.local.json` (gitignored) instead |
 | `--no-hook` | skip any hooks; install everything else |
 | `--dry-run` | print what would happen, change nothing |
+| `--skill NAME` | only that skill from a manifest's `remote` lines (`a,b` for several) |
 | `--uninstall` | remove the files and unregister the hooks |
 
 Re-running is idempotent. `SKILLS_RAW=…` points the standalone install at a fork or branch.
@@ -187,6 +207,8 @@ Re-running is idempotent. `SKILLS_RAW=…` points the standalone install at a fo
    bin       bin/x              bin/x               the helper
    hook      Stop  scripts/x.sh  hooks/x.sh         the nudge
    personal  NOTES.md           NOTES.md            beside the repo, never clobbered
+   remote    owner/repo@v1  skills/*  skills     every skill dir in that GitHub repo
+   remote    owner/repo     skills/x  skills/x   or just one
 
    rewrite  ${CLAUDE_PLUGIN_ROOT}/bin/x  @ROOT@/bin/x
    tip      /x — try this first

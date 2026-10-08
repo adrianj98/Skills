@@ -1,0 +1,25 @@
+# Not ours — Jesse Vincent's superpowers skills, pulled from GitHub at install time.
+# Verbs are documented in ../adversarial-review/install.manifest.
+#
+#   install.sh superpowers --global                         every skill below
+#   install.sh superpowers --skill brainstorming --global   just one (or --skill a,b)
+#   install.sh superpowers --list                           what there is to pick from
+
+name   Superpowers (obra/superpowers)
+about  Jesse Vincent's skills library: brainstorming, TDD, systematic debugging, plans. Pulled from GitHub.
+
+# Every skill under skills/ in the repo. Pin a release with obra/superpowers@v5.0.0.
+remote  obra/superpowers  skills/*  skills  from obra/superpowers
+
+# Or name them one at a time instead of the line above:
+# remote  obra/superpowers  skills/brainstorming         skills/brainstorming         /brainstorming
+# remote  obra/superpowers  skills/systematic-debugging  skills/systematic-debugging  /systematic-debugging
+#
+# executing-plans calls scripts in subagent-driven-development; install them together.
+
+# The skills point at each other as superpowers:<skill>; installed bare, they are /<skill>.
+rewrite  superpowers:
+
+tip  /brainstorming            before building anything
+tip  /systematic-debugging     when something is broken
+tip  /writing-plans            turn a spec into steps
