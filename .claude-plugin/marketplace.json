@@ -13,10 +13,20 @@
       "source": "./plugins/adversarial-review",
       "description": "A reviewer that assumes your code is wrong, in a context window that never saw you write it. Split-context review modelled on Bun's Zig-to-Rust rewrite.",
       "version": "0.2.1",
-      "author": { "name": "Adrian Jones", "url": "https://github.com/adrianj98" },
+      "author": {
+        "name": "Adrian Jones",
+        "url": "https://github.com/adrianj98"
+      },
       "repository": "https://github.com/adrianj98/skills",
       "license": "MIT",
-      "keywords": ["code-review", "adversarial", "subagents", "workflow", "hooks", "quality"],
+      "keywords": [
+        "code-review",
+        "adversarial",
+        "subagents",
+        "workflow",
+        "hooks",
+        "quality"
+      ],
       "category": "development"
     },
     {
@@ -25,10 +35,19 @@
       "source": "./plugins/standup",
       "description": "A very short list of what you worked on since your last working day, from the commits in every worktree of the current repo, your GitHub PRs, your Jira issues and any aj-log.md.",
       "version": "0.1.0",
-      "author": { "name": "Adrian Jones", "url": "https://github.com/adrianj98" },
+      "author": {
+        "name": "Adrian Jones",
+        "url": "https://github.com/adrianj98"
+      },
       "repository": "https://github.com/adrianj98/skills",
       "license": "MIT",
-      "keywords": ["standup", "git", "worktrees", "commits", "daily"],
+      "keywords": [
+        "standup",
+        "git",
+        "worktrees",
+        "commits",
+        "daily"
+      ],
       "category": "productivity"
     },
     {
@@ -37,10 +56,20 @@
       "source": "./plugins/deslop",
       "description": "Finds the AI slop in what just changed — restating comments, defensive checks on trusted values, dead abstraction, inflated prose — reports it, and on request cuts it.",
       "version": "0.1.0",
-      "author": { "name": "Adrian Jones", "url": "https://github.com/adrianj98" },
+      "author": {
+        "name": "Adrian Jones",
+        "url": "https://github.com/adrianj98"
+      },
       "repository": "https://github.com/adrianj98/skills",
       "license": "MIT",
-      "keywords": ["slop", "cleanup", "code-review", "quality", "comments", "prose"],
+      "keywords": [
+        "slop",
+        "cleanup",
+        "code-review",
+        "quality",
+        "comments",
+        "prose"
+      ],
       "category": "development"
     },
     {
@@ -49,10 +78,21 @@
       "source": "./plugins/showmethedata",
       "description": "Point it at a file, type, table, field or feature and it explains how that data is stored and used — where it lives, its shape across layers and where the shapes drift, who writes it, who reads it, how it moves, and when it dies.",
       "version": "0.1.0",
-      "author": { "name": "Adrian Jones", "url": "https://github.com/adrianj98" },
+      "author": {
+        "name": "Adrian Jones",
+        "url": "https://github.com/adrianj98"
+      },
       "repository": "https://github.com/adrianj98/skills",
       "license": "MIT",
-      "keywords": ["data", "data-flow", "schema", "storage", "database", "tracing", "codebase-understanding"],
+      "keywords": [
+        "data",
+        "data-flow",
+        "schema",
+        "storage",
+        "database",
+        "tracing",
+        "codebase-understanding"
+      ],
       "category": "development"
     },
     {
@@ -61,10 +101,20 @@
       "source": "./plugins/doubt",
       "description": "Questions an analysis or diagnosis the AI gave: splits it into claims, checks the load-bearing ones in a fresh context, names the explanations it skipped, and says what holds, what's wrong and what was never verified.",
       "version": "0.1.0",
-      "author": { "name": "Adrian Jones", "url": "https://github.com/adrianj98" },
+      "author": {
+        "name": "Adrian Jones",
+        "url": "https://github.com/adrianj98"
+      },
       "repository": "https://github.com/adrianj98/skills",
       "license": "MIT",
-      "keywords": ["diagnosis", "debugging", "verification", "root-cause", "skepticism", "quality"],
+      "keywords": [
+        "diagnosis",
+        "debugging",
+        "verification",
+        "root-cause",
+        "skepticism",
+        "quality"
+      ],
       "category": "development"
     },
     {
@@ -73,10 +123,42 @@
       "source": "./plugins/caveman",
       "description": "Light caveman mode: short, plain, filler-free replies for the rest of the session. Code, errors and technical terms stay exact; warnings stay in full sentences.",
       "version": "0.1.0",
-      "author": { "name": "Adrian Jones", "url": "https://github.com/adrianj98" },
+      "author": {
+        "name": "Adrian Jones",
+        "url": "https://github.com/adrianj98"
+      },
       "repository": "https://github.com/adrianj98/skills",
       "license": "MIT",
-      "keywords": ["terse", "tokens", "brevity", "caveman", "output"],
+      "keywords": [
+        "terse",
+        "tokens",
+        "brevity",
+        "caveman",
+        "output"
+      ],
+      "category": "productivity"
+    },
+    {
+      "name": "progress",
+      "displayName": "Progress",
+      "source": "./plugins/progress",
+      "description": "Where a branch and its pull request stand: what it's about, then its state — review, checks, conflicts, what's unpushed, and the one thing left before it merges.",
+      "version": "0.1.0",
+      "author": {
+        "name": "Adrian Jones",
+        "url": "https://github.com/adrianj98"
+      },
+      "repository": "https://github.com/adrianj98/skills",
+      "license": "MIT",
+      "keywords": [
+        "progress",
+        "pull-request",
+        "pr",
+        "branch",
+        "status",
+        "git",
+        "github"
+      ],
       "category": "productivity"
     }
   ]

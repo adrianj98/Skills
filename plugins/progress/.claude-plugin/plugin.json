@@ -1,0 +1,10 @@
+{
+  "name": "progress",
+  "displayName": "Progress",
+  "version": "0.1.0",
+  "description": "Where a branch and its pull request stand: what it's about, then its state — review, checks, conflicts, what's unpushed, and the one thing left before it merges.",
+  "author": { "name": "Adrian Jones", "url": "https://github.com/adrianj98" },
+  "repository": "https://github.com/adrianj98/skills",
+  "license": "MIT",
+  "keywords": ["progress", "pull-request", "pr", "branch", "status", "git", "github"]
+}

@@ -1,5 +1,22 @@
 # aj-log
 
+## 2026-10-12 — progress plugin
+
+- `plugins/progress/`: new `/progress` skill. Two sections: what the PR/branch is about, then
+  its state. Why: one command to answer "where is this PR at" instead of reading the PR page,
+  the checks tab and `git status` separately.
+- `scripts/progress.sh`: gathers branch vs base and vs remote, working tree, commits with
+  bodies, diffstat, `gh pr view` fields, review threads via GraphQL (the CLI view has no
+  `isResolved`), the last conversation comments, aj-log.md lines the branch added, and any
+  Jira-style keys. Takes nothing (checked-out branch), a PR number, a branch or a PR URL.
+  Why a script: the baseline run without it took five tool calls and 40k tokens to reach
+  the same facts.
+- SKILL.md is a positive recipe (fixed section shapes, bullet order) rather than a list of
+  don'ts. Why: the baseline failure was shape, not discipline: shas, every passing check
+  named, suggested shell commands.
+- Registered in `marketplace.json`, `plugins/index`, root README; `install.manifest` for
+  `install.sh progress`.
+
 ## 2026-10-08 — remote skills in install manifests
 
 - `install.sh`: new `remote <owner/repo[@ref]> <path> <dest> <desc>` manifest verb. Downloads

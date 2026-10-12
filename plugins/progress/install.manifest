@@ -1,0 +1,16 @@
+# What ../../install.sh copies when someone installs this plugin without the plugin system.
+# Verbs are documented in ../adversarial-review/install.manifest.
+
+name   Progress
+about  Where a branch and its PR stand: what it's about, then review, checks, conflicts, unpushed work and what's left.
+
+file   skills/progress/SKILL.md  skills/progress/SKILL.md     /progress
+file   scripts/progress.sh       skills/progress/progress.sh  gathers the branch, PR, reviews, checks and aj-log.md
+
+# Outside the plugin system there is no ${CLAUDE_PLUGIN_ROOT} and no /plugin:skill namespace.
+rewrite  ${CLAUDE_PLUGIN_ROOT}/scripts/progress.sh  @ROOT@/skills/progress/progress.sh
+rewrite  /progress:progress                         /progress
+
+tip  /progress              the checked-out branch and its PR
+tip  /progress 189          a PR by number
+tip  /progress feature/x    a branch, local or remote

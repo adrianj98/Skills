@@ -47,6 +47,21 @@ claude plugin install standup@adrianj98-skills
 
 `/standup since friday` widens the window; `/standup everyone` includes every author.
 
+### [`progress`](plugins/progress) · v0.1.0
+
+`/progress` — where a branch and its pull request stand, in two sections. *What it's about*
+is a paragraph from the PR description, the commit bodies and `aj-log.md`. *State* is a short
+list: none yet / draft / open / merged, who approved or is still being waited on and how many
+review threads are open, which checks fail, conflicts or commits behind the base, what's
+uncommitted or unpushed, any unanswered question in the conversation, and the one thing left
+before it merges. `/progress 189` takes a PR number, `/progress feature/x` a branch.
+
+```bash
+claude plugin install progress@adrianj98-skills
+```
+
+[Full README →](plugins/progress/README.md)
+
 ### [`deslop`](plugins/deslop) · v0.1.0
 
 `/deslop` — what in this change reads like a machine wrote it, as a report you can act on;
