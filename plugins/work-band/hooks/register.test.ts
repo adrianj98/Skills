@@ -847,12 +847,12 @@ test('the account line: plan and org from claude auth status', () => {
   expect(parseAuthStatus('not json')).toBe(null)
 })
 
-test('the band ends with the account', async ($, on) => {
+test('the band ends with the plan alone, not the org', async ($, on) => {
   await startIn($, on, 'git@github.com:alert-d/alertd-core.git', '', mock.clock(on), false, new Map(), argv =>
     argv.join(' ') === 'claude auth status'
       ? JSON.stringify({ loggedIn: true, authMethod: 'claude.ai', orgName: 'AlertD', subscriptionType: 'team' })
       : undefined,
   )
   const band = await mountBand($, 'terminal')
-  expect((await band.findAll({ type: 'Box' }))[1]!.text).toMatch(/Team · AlertD$/)
+  expect((await band.findAll({ type: 'Box' }))[1]!.text).toMatch(/ {3}Team$/)
 })

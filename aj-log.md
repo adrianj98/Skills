@@ -49,3 +49,11 @@
 - `plugins/superpowers/install.manifest` + `plugins/index`: installs obra/superpowers'
   skills, rewriting `superpowers:<skill>` to bare names.
 - Verb reference in `plugins/adversarial-review/install.manifest` and README updated.
+
+## 2026-10-12 — work-band shows the plan alone
+
+- `plugins/work-band/hooks/register.tsx`: the account text at the end of the band is now
+  just the plan (`Max`, `Team`, ...), no ` · <org>` after it. Why: a personal org is named
+  `<email>'s Organization`, which swamped the band; only the first word was wanted.
+- `register.test.ts`: the band test now expects `   Team` at the end, not `Team · AlertD`.
+  `parseAuthStatus` still returns `org` for anything that wants it later.

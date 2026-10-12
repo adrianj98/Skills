@@ -1033,7 +1033,6 @@ export const register: Register = on => {
             <Text dimColor>
               {'   '}
               {acct.plan}
-              {acct.org ? ` · ${acct.org}` : ''}
             </Text>
           ) : null}
         </Box>
