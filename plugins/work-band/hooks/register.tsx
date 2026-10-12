@@ -39,7 +39,7 @@ const logView = atom({ plugin: 'work-band', key: 'logView' } as const, { task: '
 const SERVE_REPO = /[:/]alert-d\/alertd-core(\.git)?$/
 const SERVE_ARGV = ['npx', 'turbo', 'run', 'serve', '--ui=stream']
 const DRY_ARGV = ['npx', 'turbo', 'run', 'serve', '--dry=json']
-const JIRA_TOOL = 'mcp__claude_ai_Atlassian__getJiraIssue'
+const JIRA_TOOL = 'mcp__claude_ai_Atlassian_Rovo__getJiraIssue'
 const JIRA_SITE = 'alertd.atlassian.net'
 
 export const jiraUrl = (key: string) => `https://${JIRA_SITE}/browse/${key}`

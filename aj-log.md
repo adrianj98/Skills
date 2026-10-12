@@ -59,3 +59,8 @@
   `parseAuthStatus` still returns `org` for anything that wants it later.
 - `register.tsx`: the plan is drawn in `magenta` (a raw colour, so it stays purple in every
   theme) and no longer dimmed. Why: asked for it in purple.
+- `register.tsx`, `register.test.ts`: the Jira tool is `mcp__claude_ai_Atlassian_Rovo__getJiraIssue`.
+  Why: the claude.ai connector was renamed from "Atlassian" to "Atlassian Rovo", so the old
+  tool name no longer exists, `$.tool.check` never allowed it, and the band showed
+  "allow getJiraIssue to show status" on every refresh. Calling the Rovo tool with the mod's
+  exact input (site URL as cloudId, fields: status) returns the status JSON the regex reads.

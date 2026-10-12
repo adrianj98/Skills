@@ -282,7 +282,7 @@ for (const surface of ['terminal', 'desktop'] as const) {
 for (const surface of ['terminal', 'desktop'] as const) {
   test(`${surface}: the band draws a real PR, its Jira status and the server control`, async ($, on) => {
     on('tool.check', () => ({ decision: 'allow' }) as never)
-    on('tool.call', { tool: 'mcp__claude_ai_Atlassian__getJiraIssue' }, () =>
+    on('tool.call', { tool: 'mcp__claude_ai_Atlassian_Rovo__getJiraIssue' }, () =>
       ({ result: {}, text: '{"key":"AL-4169","fields":{"status":{"name":"To Do","id":"10033"}}}' }) as never,
     )
     await startIn(
