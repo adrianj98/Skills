@@ -286,8 +286,11 @@ for (const surface of ['terminal', 'desktop'] as const) {
   test(`${surface}: the band draws a real PR, its Jira status and the server control`, async ($, on) => {
     on('tool.list', () => ({ value: [{ name: 'mcp__claude_ai_Atlassian_Rovo__getJiraIssue', description: '', mcp: true }] }) as never)
     on('tool.check', () => ({ decision: 'allow' }) as never)
-    on('tool.call', { tool: 'mcp__claude_ai_Atlassian_Rovo__getJiraIssue' }, () =>
-      ({ result: {}, text: '{"key":"AL-4169","fields":{"status":{"name":"To Do","id":"10033"}}}' }) as never,
+    // No matcher: the tool-name union is laid from this machine's connectors.
+    on('tool.call', (_$, e, next) =>
+      e.tool === 'mcp__claude_ai_Atlassian_Rovo__getJiraIssue'
+        ? ({ result: {}, text: '{"key":"AL-4169","fields":{"status":{"name":"To Do","id":"10033"}}}' } as never)
+        : next(e),
     )
     await startIn(
       $,
@@ -327,8 +330,8 @@ const PR_WITH_KEY = JSON.stringify({ number: 1, state: 'OPEN', isDraft: false, t
 test('the band reads status from a local atlassian server too', async ($, on) => {
   on('tool.list', () => ({ value: [{ name: 'mcp__atlassian__getJiraIssue', description: '', mcp: true }] }) as never)
   on('tool.check', () => ({ decision: 'allow' }) as never)
-  on('tool.call', { tool: 'mcp__atlassian__getJiraIssue' }, () =>
-    ({ result: {}, text: '{"fields":{"status":{"name":"In Progress"}}}' }) as never,
+  on('tool.call', (_$, e, next) =>
+    (e.tool as string) === 'mcp__atlassian__getJiraIssue' ? ({ result: {}, text: '{"fields":{"status":{"name":"In Progress"}}}' } as never) : next(e),
   )
   await startIn($, on, 'git@github.com:alert-d/alertd-core.git', PR_WITH_KEY, mock.clock(on), true)
   const ui = await mountBand($, 'terminal')
