@@ -80,3 +80,5 @@
   measures the row as drawn. Why: a long title wrapped the band onto extra lines.
 - `register.test.ts`: `mountBand` takes a column count; tests for the measure, the cut, and
   the two-row / three-row layouts at 200 and 60 columns.
+- `register.tsx`: the Jira title is drawn dim (grey), on the first row and on its own row,
+  so the key stands out. Why: asked for a lighter grey.

@@ -1023,7 +1023,7 @@ export const register: Register = on => {
           <Text bold>{j.key}</Text>
         </Button>,
         'title' in j ? (
-          <Text key="jira-title" wrap="truncate-end">
+          <Text key="jira-title" dimColor wrap="truncate-end">
             {' '}
             {j.title}
           </Text>
@@ -1052,7 +1052,7 @@ export const register: Register = on => {
           <Button key="jira" plain label={j.key} onPress={() => openUrl($, jiraUrl(j.key))}>
             <Text bold>{j.key}</Text>
           </Button>
-          <Text key="jira-title" wrap="truncate-end">
+          <Text key="jira-title" dimColor wrap="truncate-end">
             {' '}
             {fitWidth(j.title, e.props.bodyColumns - j.key.length - 1)}
           </Text>
