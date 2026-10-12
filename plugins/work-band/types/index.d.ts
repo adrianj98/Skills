@@ -22,7 +22,7 @@ export type Pr = {
 export type Account = { plan: string; org?: string; email?: string }
 export type DiffStat = { added: number; removed: number; base: string }
 export type FilesMode = 'all' | 'pr' | 'uncommitted'
-export type Jira = { key: string; status: string } | { key: string; error: string }
+export type Jira = { key: string; title: string } | { key: string; error: string }
 export type Task = {
   name: string
   state: 'pending' | 'running' | 'done' | 'failed' | 'stopped'

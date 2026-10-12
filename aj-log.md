@@ -71,3 +71,6 @@
   Why: the connector name differs between sessions and machines, and renaming broke the band.
 - `register.test.ts`: the harness answers `tool.list` with nothing unless a test owns Jira;
   tests for picking the tool, reading status via a local server, and both error texts.
+- `register.tsx`, `types/index.d.ts`: the band shows the Jira issue's title (its `summary`)
+  after the key, not its status. `parseJiraTitle` reads it from getJiraIssue's JSON and
+  undoes JSON escapes; the text truncates at the band's edge. Why: asked for the title.

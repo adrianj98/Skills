@@ -18,6 +18,7 @@ import {
   mergePlan,
   mergePrompt,
   parseDry,
+  parseJiraTitle,
   pickJiraTool,
   taskOfLine,
   toChecks,
@@ -283,13 +284,13 @@ for (const surface of ['terminal', 'desktop'] as const) {
 }
 
 for (const surface of ['terminal', 'desktop'] as const) {
-  test(`${surface}: the band draws a real PR, its Jira status and the server control`, async ($, on) => {
+  test(`${surface}: the band draws a real PR, its Jira title and the server control`, async ($, on) => {
     on('tool.list', () => ({ value: [{ name: 'mcp__claude_ai_Atlassian_Rovo__getJiraIssue', description: '', mcp: true }] }) as never)
     on('tool.check', () => ({ decision: 'allow' }) as never)
     // No matcher: the tool-name union is laid from this machine's connectors.
     on('tool.call', (_$, e, next) =>
       e.tool === 'mcp__claude_ai_Atlassian_Rovo__getJiraIssue'
-        ? ({ result: {}, text: '{"key":"AL-4169","fields":{"status":{"name":"To Do","id":"10033"}}}' } as never)
+        ? ({ result: {}, text: '{"key":"AL-4169","fields":{"summary":"MATEOAS: route tables, apiPage helper","status":{"name":"To Do"}}}' } as never)
         : next(e),
     )
     await startIn(
@@ -309,13 +310,20 @@ for (const surface of ['terminal', 'desktop'] as const) {
     const ui = await mountBand($, surface)
     const row = (await ui.findAll({ type: 'Box' }))[1]!.text
     expect(row).toContain('PR #2902 open')
-    expect(row).toContain('AL-4169 To Do')
+    expect(row).toContain('AL-4169 MATEOAS: route tables, apiPage helper')
     expect(await ui.find({ type: 'Link' })).toBeUndefined()
     await ui.press({ key: 'jira' })
     expect(opened('https://alertd.atlassian.net/browse/AL-4169')).toBe(true)
     expect(row).toContain('[ server :1776 ^ ]')
   })
 }
+
+test('the title is the summary field, JSON escapes undone', () => {
+  expect(parseJiraTitle('{"fields":{"summary":"Price the models \\u2014 \\"unpriced\\" ones","status":{"name":"To Do"}}}')).toBe(
+    'Price the models \u2014 "unpriced" ones',
+  )
+  expect(parseJiraTitle('{"fields":{"status":{"name":"To Do"}}}')).toBe(undefined)
+})
 
 test('the Jira tool is whichever connected server serves getJiraIssue', () => {
   expect(pickJiraTool(['Bash', 'mcp__claude_ai_Atlassian_Rovo__getJiraIssue', 'mcp__claude_ai_Atlassian_Rovo__search'])).toBe(
@@ -327,15 +335,15 @@ test('the Jira tool is whichever connected server serves getJiraIssue', () => {
 
 const PR_WITH_KEY = JSON.stringify({ number: 1, state: 'OPEN', isDraft: false, title: 'AL-4169 x', statusCheckRollup: [] })
 
-test('the band reads status from a local atlassian server too', async ($, on) => {
+test('the band reads the title from a local atlassian server too', async ($, on) => {
   on('tool.list', () => ({ value: [{ name: 'mcp__atlassian__getJiraIssue', description: '', mcp: true }] }) as never)
   on('tool.check', () => ({ decision: 'allow' }) as never)
   on('tool.call', (_$, e, next) =>
-    (e.tool as string) === 'mcp__atlassian__getJiraIssue' ? ({ result: {}, text: '{"fields":{"status":{"name":"In Progress"}}}' } as never) : next(e),
+    (e.tool as string) === 'mcp__atlassian__getJiraIssue' ? ({ result: {}, text: '{"fields":{"summary":"Say \\"hi\\" \\u00e9"}}' } as never) : next(e),
   )
   await startIn($, on, 'git@github.com:alert-d/alertd-core.git', PR_WITH_KEY, mock.clock(on), true)
   const ui = await mountBand($, 'terminal')
-  expect((await ui.findAll({ type: 'Box' }))[1]!.text).toContain('AL-4169 In Progress')
+  expect((await ui.findAll({ type: 'Box' }))[1]!.text).toContain('AL-4169 Say "hi" é')
 })
 
 test('the band names the tool to allow, and says when no Jira server is connected', async ($, on) => {
@@ -349,7 +357,7 @@ test('the band names the tool to allow, and says when no Jira server is connecte
   listed = ['mcp__claude_ai_Atlassian_Rovo__getJiraIssue']
   await clock.advance(120_000)
   ui = await mountBand($, 'terminal')
-  expect((await ui.findAll({ type: 'Box' }))[1]!.text).toContain('AL-4169 allow mcp__claude_ai_Atlassian_Rovo__getJiraIssue to show status')
+  expect((await ui.findAll({ type: 'Box' }))[1]!.text).toContain('AL-4169 allow mcp__claude_ai_Atlassian_Rovo__getJiraIssue to show the title')
 })
 
 test('a line names the task that printed it', () => {

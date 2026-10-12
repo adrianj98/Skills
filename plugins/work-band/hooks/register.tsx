@@ -43,6 +43,17 @@ const DRY_ARGV = ['npx', 'turbo', 'run', 'serve', '--dry=json']
 // older "Atlassian", a local `atlassian` server. Every one serves getJiraIssue.
 export const pickJiraTool = (names: readonly string[]): string | undefined =>
   names.find(n => /^mcp__.+__getJiraIssue$/.test(n))
+
+// The issue's summary from getJiraIssue's JSON, JSON escapes undone.
+export const parseJiraTitle = (text: string): string | undefined => {
+  const raw = text.match(/"summary"\s*:\s*"((?:[^"\\]|\\.)*)"/)?.[1]
+  if (!raw) return undefined
+  try {
+    return JSON.parse(`"${raw}"`) as string
+  } catch {
+    return raw
+  }
+}
 const JIRA_SITE = 'alertd.atlassian.net'
 
 export const jiraUrl = (key: string) => `https://${JIRA_SITE}/browse/${key}`
@@ -473,17 +484,17 @@ async function refreshJira($: EngineInterface, current: Pr | null) {
     await update($, jira, (): Jira => ({ key, error: 'no Jira MCP connected' }))
     return
   }
-  const input = { tool, cloudId: JIRA_SITE, issueIdOrKey: key, fields: ['status'] }
+  const input = { tool, cloudId: JIRA_SITE, issueIdOrKey: key, fields: ['summary'] }
   // A refresh every two minutes must never open a permission dialog.
   const { decision } = await $.tool.check({ tool, input })
   if (decision !== 'allow') {
-    await update($, jira, (): Jira => ({ key, error: `allow ${tool} to show status` }))
+    await update($, jira, (): Jira => ({ key, error: `allow ${tool} to show the title` }))
     return
   }
   const result = await $.tool.call(input as never)
   const text = 'text' in result && typeof result.text === 'string' ? result.text : ''
-  const status = text.match(/"status"\s*:\s*\{[^}]*?"name"\s*:\s*"([^"]+)"/)?.[1]
-  await update($, jira, (): Jira => (status ? { key, status } : { key, error: 'no status' }))
+  const title = parseJiraTitle(text)
+  await update($, jira, (): Jira => (title ? { key, title } : { key, error: 'no title' }))
 }
 
 async function checkRepo($: EngineInterface) {
@@ -995,8 +1006,11 @@ export const register: Register = on => {
         <Button key="jira" plain label={j.key} onPress={() => openUrl($, jiraUrl(j.key))}>
           <Text bold>{j.key}</Text>
         </Button>,
-        'status' in j ? (
-          <Text key="jira-status"> {j.status}</Text>
+        'title' in j ? (
+          <Text key="jira-title" wrap="truncate-end">
+            {' '}
+            {j.title}
+          </Text>
         ) : (
           <Text key="jira-status" dimColor>
             {' '}
