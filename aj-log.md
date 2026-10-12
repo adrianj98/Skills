@@ -64,3 +64,10 @@
   tool name no longer exists, `$.tool.check` never allowed it, and the band showed
   "allow getJiraIssue to show status" on every refresh. Calling the Rovo tool with the mod's
   exact input (site URL as cloudId, fields: status) returns the status JSON the regex reads.
+- `register.tsx`: the Jira tool is no longer a hardcoded name. `pickJiraTool` takes the first
+  `mcp__*__getJiraIssue` from `$.tool.list()`, so the band works with claude.ai "Atlassian Rovo",
+  the older "Atlassian", or a local `atlassian` server. With none connected the band says
+  "no Jira MCP connected"; when the tool isn't allowed it names the exact tool to allow.
+  Why: the connector name differs between sessions and machines, and renaming broke the band.
+- `register.test.ts`: the harness answers `tool.list` with nothing unless a test owns Jira;
+  tests for picking the tool, reading status via a local server, and both error texts.

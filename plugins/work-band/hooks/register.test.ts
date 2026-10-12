@@ -18,6 +18,7 @@ import {
   mergePlan,
   mergePrompt,
   parseDry,
+  pickJiraTool,
   taskOfLine,
   toChecks,
   withoutPrefix,
@@ -75,7 +76,9 @@ const startIn = async ($: Engine, on: On, origin: string, prJson: string | (() =
     store.set(e.key, e.value)
     return { value: undefined } as never
   })
-  // Jira's tool is never allowed here unless a test answers tool.check first.
+  // Jira's tool is neither listed nor allowed here unless a test answers
+  // tool.list and tool.check itself.
+  if (!ownJira) on('tool.list', () => ({ value: [] }) as never)
   if (!ownJira) on('tool.check', () => ({ decision: 'ask' }) as never)
   on('session.start', (_$, e) => ({ cwd: e.cwd }))
   on('command.register', (_$, e) => ({ value: { command: e.name } }))
@@ -281,6 +284,7 @@ for (const surface of ['terminal', 'desktop'] as const) {
 
 for (const surface of ['terminal', 'desktop'] as const) {
   test(`${surface}: the band draws a real PR, its Jira status and the server control`, async ($, on) => {
+    on('tool.list', () => ({ value: [{ name: 'mcp__claude_ai_Atlassian_Rovo__getJiraIssue', description: '', mcp: true }] }) as never)
     on('tool.check', () => ({ decision: 'allow' }) as never)
     on('tool.call', { tool: 'mcp__claude_ai_Atlassian_Rovo__getJiraIssue' }, () =>
       ({ result: {}, text: '{"key":"AL-4169","fields":{"status":{"name":"To Do","id":"10033"}}}' }) as never,
@@ -309,6 +313,41 @@ for (const surface of ['terminal', 'desktop'] as const) {
     expect(row).toContain('[ server :1776 ^ ]')
   })
 }
+
+test('the Jira tool is whichever connected server serves getJiraIssue', () => {
+  expect(pickJiraTool(['Bash', 'mcp__claude_ai_Atlassian_Rovo__getJiraIssue', 'mcp__claude_ai_Atlassian_Rovo__search'])).toBe(
+    'mcp__claude_ai_Atlassian_Rovo__getJiraIssue',
+  )
+  expect(pickJiraTool(['mcp__atlassian__getJiraIssue'])).toBe('mcp__atlassian__getJiraIssue')
+  expect(pickJiraTool(['mcp__claude_ai_Atlassian__getJiraIssueRemoteIssueLinks', 'Read'])).toBe(undefined)
+})
+
+const PR_WITH_KEY = JSON.stringify({ number: 1, state: 'OPEN', isDraft: false, title: 'AL-4169 x', statusCheckRollup: [] })
+
+test('the band reads status from a local atlassian server too', async ($, on) => {
+  on('tool.list', () => ({ value: [{ name: 'mcp__atlassian__getJiraIssue', description: '', mcp: true }] }) as never)
+  on('tool.check', () => ({ decision: 'allow' }) as never)
+  on('tool.call', { tool: 'mcp__atlassian__getJiraIssue' }, () =>
+    ({ result: {}, text: '{"fields":{"status":{"name":"In Progress"}}}' }) as never,
+  )
+  await startIn($, on, 'git@github.com:alert-d/alertd-core.git', PR_WITH_KEY, mock.clock(on), true)
+  const ui = await mountBand($, 'terminal')
+  expect((await ui.findAll({ type: 'Box' }))[1]!.text).toContain('AL-4169 In Progress')
+})
+
+test('the band names the tool to allow, and says when no Jira server is connected', async ($, on) => {
+  let listed: string[] = []
+  on('tool.list', () => ({ value: listed.map(name => ({ name, description: '', mcp: true })) }) as never)
+  on('tool.check', () => ({ decision: 'ask' }) as never)
+  const clock = mock.clock(on)
+  await startIn($, on, 'git@github.com:alert-d/alertd-core.git', PR_WITH_KEY, clock, true)
+  let ui = await mountBand($, 'terminal')
+  expect((await ui.findAll({ type: 'Box' }))[1]!.text).toContain('AL-4169 no Jira MCP connected')
+  listed = ['mcp__claude_ai_Atlassian_Rovo__getJiraIssue']
+  await clock.advance(120_000)
+  ui = await mountBand($, 'terminal')
+  expect((await ui.findAll({ type: 'Box' }))[1]!.text).toContain('AL-4169 allow mcp__claude_ai_Atlassian_Rovo__getJiraIssue to show status')
+})
 
 test('a line names the task that printed it', () => {
   expect(taskOfLine('//:build:watch: > npm run build -- --watch')).toBe('build:watch')

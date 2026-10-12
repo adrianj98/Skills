@@ -39,7 +39,10 @@ const logView = atom({ plugin: 'work-band', key: 'logView' } as const, { task: '
 const SERVE_REPO = /[:/]alert-d\/alertd-core(\.git)?$/
 const SERVE_ARGV = ['npx', 'turbo', 'run', 'serve', '--ui=stream']
 const DRY_ARGV = ['npx', 'turbo', 'run', 'serve', '--dry=json']
-const JIRA_TOOL = 'mcp__claude_ai_Atlassian_Rovo__getJiraIssue'
+// Whichever Jira MCP server is connected: claude.ai's "Atlassian Rovo", its
+// older "Atlassian", a local `atlassian` server. Every one serves getJiraIssue.
+export const pickJiraTool = (names: readonly string[]): string | undefined =>
+  names.find(n => /^mcp__.+__getJiraIssue$/.test(n))
 const JIRA_SITE = 'alertd.atlassian.net'
 
 export const jiraUrl = (key: string) => `https://${JIRA_SITE}/browse/${key}`
@@ -465,11 +468,16 @@ async function refreshJira($: EngineInterface, current: Pr | null) {
     await update($, jira, () => null)
     return
   }
-  const input = { tool: JIRA_TOOL, cloudId: JIRA_SITE, issueIdOrKey: key, fields: ['status'] }
+  const tool = pickJiraTool((await $.tool.list()).map(t => t.name))
+  if (!tool) {
+    await update($, jira, (): Jira => ({ key, error: 'no Jira MCP connected' }))
+    return
+  }
+  const input = { tool, cloudId: JIRA_SITE, issueIdOrKey: key, fields: ['status'] }
   // A refresh every two minutes must never open a permission dialog.
-  const { decision } = await $.tool.check({ tool: JIRA_TOOL, input })
+  const { decision } = await $.tool.check({ tool, input })
   if (decision !== 'allow') {
-    await update($, jira, (): Jira => ({ key, error: 'allow getJiraIssue to show status' }))
+    await update($, jira, (): Jira => ({ key, error: `allow ${tool} to show status` }))
     return
   }
   const result = await $.tool.call(input as never)
