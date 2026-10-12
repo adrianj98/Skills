@@ -44,6 +44,22 @@ const DRY_ARGV = ['npx', 'turbo', 'run', 'serve', '--dry=json']
 export const pickJiraTool = (names: readonly string[]): string | undefined =>
   names.find(n => /^mcp__.+__getJiraIssue$/.test(n))
 
+// Plain text of the band's first row, as wide as it is drawn, so the Jira
+// part can move to a row of its own when the row would not fit `columns`.
+export const firstRowWidth = (parts: { pr: Pr | null; diff: DiffStat | null; jira: Jira | null; serve: string; plan: string | undefined }): number => {
+  const { pr: p, diff: d, jira: j } = parts
+  const diffText = d ? `+${d.added} −${d.removed}${p ? '' : ` vs ${d.base}`}` : 'diff'
+  const prText = p
+    ? `PR #${p.number} ${p.isDraft ? 'draft' : p.state} · ${diffText} · ✓${p.passed} ✗${p.failed} …${p.pending}`
+    : `no PR · ${diffText}`
+  const jiraText = j ? `${j.key} ${'title' in j ? j.title : j.error}` : 'no Jira key'
+  return prText.length + 3 + jiraText.length + parts.serve.length + (parts.plan ? 3 + parts.plan.length : 0)
+}
+
+// `text` cut to `width` cells with an ellipsis, whole when it fits.
+export const fitWidth = (text: string, width: number): string =>
+  text.length <= width ? text : width <= 1 ? '…' : `${text.slice(0, width - 1)}…`
+
 // The issue's summary from getJiraIssue's JSON, JSON escapes undone.
 export const parseJiraTitle = (text: string): string | undefined => {
   const raw = text.match(/"summary"\s*:\s*"((?:[^"\\]|\\.)*)"/)?.[1]
@@ -1025,12 +1041,30 @@ export const register: Register = on => {
     const exitedLabel =
       s.state === 'exited' ? `exited${s.code != null ? ` ${s.code}` : s.signal ? ` (${s.signal})` : ''}` : null
 
+    // Too wide for one row: the Jira issue takes a row of its own, its title cut
+    // to the band, so the band is three rows rather than a wrapped one.
+    const serveText = isServeRepo ? `   [ server :${at} ^ ]${exitedLabel ? ` ${exitedLabel}` : ''}` : ''
+    const jiraOnOwnRow =
+      j !== null && 'title' in j && firstRowWidth({ pr: p, diff: d, jira: j, serve: serveText, plan: acct?.plan }) > e.props.bodyColumns
+    const jiraRow =
+      jiraOnOwnRow && j && 'title' in j ? (
+        <Box>
+          <Button key="jira" plain label={j.key} onPress={() => openUrl($, jiraUrl(j.key))}>
+            <Text bold>{j.key}</Text>
+          </Button>
+          <Text key="jira-title" wrap="truncate-end">
+            {' '}
+            {fitWidth(j.title, e.props.bodyColumns - j.key.length - 1)}
+          </Text>
+        </Box>
+      ) : null
+
     return (
       <Box flexDirection="column">
         <Box>
           {prPart}
-          <Text dimColor>   </Text>
-          {jiraPart}
+          {jiraOnOwnRow ? null : <Text dimColor>   </Text>}
+          {jiraOnOwnRow ? null : jiraPart}
           {isServeRepo ? (
             // `[ server ^ ]`: two chrome-less buttons inside drawn brackets,
             // since one Button is one press target.
@@ -1058,6 +1092,7 @@ export const register: Register = on => {
             </Text>
           ) : null}
         </Box>
+        {jiraRow}
         {isServeRepo && tasksOf(s).length ? (
           <Box>
             {tasksOf(s).flatMap((t, i) => [

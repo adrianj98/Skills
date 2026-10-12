@@ -17,6 +17,8 @@ import {
   keepLines,
   mergePlan,
   mergePrompt,
+  fitWidth,
+  firstRowWidth,
   parseDry,
   parseJiraTitle,
   pickJiraTool,
@@ -87,12 +89,12 @@ const startIn = async ($: Engine, on: On, origin: string, prJson: string | (() =
   await $.session.start({ cwd: '/repo', surface: null, isInteractive: true })
 }
 
-const mountBand = ($: Engine, surface: 'terminal' | 'desktop') =>
+const mountBand = ($: Engine, surface: 'terminal' | 'desktop', bodyColumns = 120) =>
   $.ui.mount({
     plugin: 'work-band',
     surface,
     component: 'AbovePrompt',
-    props: { hasSurvey: false, isWorking: false, maxRows: 10, bodyColumns: 120, scroll: { offset: 0, bodyRows: 10 }, view: {} },
+    props: { hasSurvey: false, isWorking: false, maxRows: 10, bodyColumns, scroll: { offset: 0, bodyRows: 10 }, view: {} },
   })
 
 test('counts PR checks: skipped is neither pass nor fail, in-progress is pending', () => {
@@ -324,6 +326,48 @@ test('the title is the summary field, JSON escapes undone', () => {
   )
   expect(parseJiraTitle('{"fields":{"status":{"name":"To Do"}}}')).toBe(undefined)
 })
+
+test('the first row is measured as drawn; a title is cut to a width with an ellipsis', () => {
+  const pr = { number: 2902, state: 'open', isDraft: false, passed: 1, failed: 0, pending: 0 } as never
+  expect(firstRowWidth({ pr, diff: null, jira: { key: 'AL-1', title: 'Short' }, serve: '   [ server :1776 ^ ]', plan: 'Max' })).toBe(
+    'PR #2902 open · diff · ✓1 ✗0 …0'.length + 3 + 'AL-1 Short'.length + '   [ server :1776 ^ ]'.length + '   Max'.length,
+  )
+  expect(firstRowWidth({ pr: null, diff: { added: 4, removed: 2, base: 'develop' }, jira: null, serve: '', plan: undefined })).toBe(
+    'no PR · +4 −2 vs develop   no Jira key'.length,
+  )
+  expect(fitWidth('abcdef', 6)).toBe('abcdef')
+  expect(fitWidth('abcdef', 4)).toBe('abc…')
+  expect(fitWidth('abcdef', 1)).toBe('…')
+})
+
+for (const surface of ['terminal', 'desktop'] as const) {
+  test(`${surface}: a title too wide for the row gets a row of its own, cut to the band`, async ($, on) => {
+    const title = 'Bedrock Spend: price the models that show as unpriced, including Pegasus video seconds'
+    on('tool.list', () => ({ value: [{ name: 'mcp__claude_ai_Atlassian_Rovo__getJiraIssue', description: '', mcp: true }] }) as never)
+    on('tool.check', () => ({ decision: 'allow' }) as never)
+    on('tool.call', (_$, e, next) =>
+      e.tool === 'mcp__claude_ai_Atlassian_Rovo__getJiraIssue' ? ({ result: {}, text: JSON.stringify({ fields: { summary: title } }) } as never) : next(e),
+    )
+    await startIn($, on, 'git@github.com:alert-d/alertd-core.git', PR_WITH_KEY, mock.clock(on), true)
+    // Wide enough: two rows, the title whole on the first.
+    let ui = await mountBand($, surface, 200)
+    let rows = await ui.findAll({ type: 'Box' })
+    expect(rows[1]!.text).toContain(`AL-4169 ${title}`)
+    expect(rows.length).toBe(2)
+    // Too narrow: the issue moves to its own row, cut to 60 cells, and the
+    // first row keeps the PR and the server control.
+    ui = await mountBand($, surface, 60)
+    rows = await ui.findAll({ type: 'Box' })
+    expect(rows.length).toBe(3)
+    expect(rows[1]!.text).not.toContain('AL-4169')
+    expect(rows[1]!.text).toContain('PR #1 open')
+    expect(rows[1]!.text).toContain('[ server :1776 ^ ]')
+    expect(rows[2]!.text).toBe(`AL-4169 ${title.slice(0, 60 - 'AL-4169 '.length - 1)}…`)
+    expect(rows[2]!.text.length).toBe(60)
+    await ui.press({ key: 'jira' })
+    expect(opened('https://alertd.atlassian.net/browse/AL-4169')).toBe(true)
+  })
+}
 
 test('the Jira tool is whichever connected server serves getJiraIssue', () => {
   expect(pickJiraTool(['Bash', 'mcp__claude_ai_Atlassian_Rovo__getJiraIssue', 'mcp__claude_ai_Atlassian_Rovo__search'])).toBe(

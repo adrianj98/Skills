@@ -74,3 +74,9 @@
 - `register.tsx`, `types/index.d.ts`: the band shows the Jira issue's title (its `summary`)
   after the key, not its status. `parseJiraTitle` reads it from getJiraIssue's JSON and
   undoes JSON escapes; the text truncates at the band's edge. Why: asked for the title.
+- `register.tsx`: when the first row (PR · Jira · server · plan) would be wider than the band's
+  `bodyColumns`, the Jira issue moves to a row of its own, its title cut to the band with an
+  ellipsis (`fitWidth`), so the band is three rows and nothing word-wraps. `firstRowWidth`
+  measures the row as drawn. Why: a long title wrapped the band onto extra lines.
+- `register.test.ts`: `mountBand` takes a column count; tests for the measure, the cut, and
+  the two-row / three-row layouts at 200 and 60 columns.
