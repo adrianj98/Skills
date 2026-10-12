@@ -57,3 +57,5 @@
   `<email>'s Organization`, which swamped the band; only the first word was wanted.
 - `register.test.ts`: the band test now expects `   Team` at the end, not `Team · AlertD`.
   `parseAuthStatus` still returns `org` for anything that wants it later.
+- `register.tsx`: the plan is drawn in `magenta` (a raw colour, so it stays purple in every
+  theme) and no longer dimmed. Why: asked for it in purple.

@@ -1030,9 +1030,9 @@ export const register: Register = on => {
           {isServeRepo ? <Text> ]</Text> : null}
           {exitedLabel && isServeRepo ? <Text color="error"> {exitedLabel}</Text> : null}
           {acct ? (
-            <Text dimColor>
+            <Text>
               {'   '}
-              {acct.plan}
+              <Text color="magenta">{acct.plan}</Text>
             </Text>
           ) : null}
         </Box>
