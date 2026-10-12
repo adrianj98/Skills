@@ -695,6 +695,43 @@ const mountFiles = ($: Engine, surface: 'terminal' | 'desktop') =>
     props: { title: 'Files', isFocused: false, bodyColumns: 100, placement: 'dock', scroll: { offset: 0, bodyRows: 30 } } as never,
   })
 
+for (const surface of ['terminal', 'desktop'] as const) {
+  test(`${surface}: with the filetree mod installed, Files runs /filetree instead of opening its own pane`, async ($, on) => {
+    const open = paneHooks(on)
+    const runs: string[] = []
+    const toasts: string[] = []
+    let answer = 'File tree on ~/alertd-core (follows the cwd).'
+    on('command.list', () => ({ value: [{ name: 'filetree', description: 'Show the file tree', source: 'plugin', plugin: 'filetree' }] }) as never)
+    on('command.run', { command: 'filetree' }, (_$, e) => {
+      runs.push(`${e.command} ${e.args}`.trim())
+      return { text: answer }
+    })
+    on('ui.toast', (_$, e) => {
+      toasts.push(e.text)
+      return { value: undefined } as never
+    })
+    await startIn($, on, 'git@github.com:alert-d/alertd-core.git', '', mock.clock(on), false, new Map(), REPO)
+    const band = await mountBand($, surface)
+    await band.press({ key: 'files' })
+    expect(runs).toEqual(['filetree'])
+    expect([...open]).toEqual([])
+    expect(toasts).toEqual([])
+    // filetree's refusal reaches the person as a toast.
+    answer = 'filetree shows in the sidebar, which needs a terminal at least 110 columns wide. Widen it, then run /filetree.'
+    await band.press({ key: 'files' })
+    expect(toasts).toEqual([answer])
+  })
+}
+
+test('without the filetree mod, Files opens the band\'s own pane', async ($, on) => {
+  const open = paneHooks(on)
+  on('command.list', () => ({ value: [{ name: 'wb', description: '', source: 'plugin', plugin: 'work-band' }] }) as never)
+  await startIn($, on, 'git@github.com:alert-d/alertd-core.git', '', mock.clock(on), false, new Map(), REPO)
+  const band = await mountBand($, 'terminal')
+  await band.press({ key: 'files' })
+  expect([...open]).toEqual(['files'])
+})
+
 const fileRows = async (pane: { findAll: (q: { type: string }) => Promise<{ text: string; key: string | undefined }[]> }) =>
   (await pane.findAll({ type: 'Text' }))
     .filter(t => /^ *(?:[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏] |  )\S/.test(t.text) || /^ *[▸▾] /.test(t.text))

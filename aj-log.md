@@ -82,3 +82,10 @@
   the two-row / three-row layouts at 200 and 60 columns.
 - `register.tsx`: the Jira title is drawn dim (grey), on the first row and on its own row,
   so the key stands out. Why: asked for a lighter grey.
+- `register.tsx`: the Files button runs `/filetree` when the filetree mod
+  (data-goblin/claude-code-filetree) is installed, found through `$.command.list()`; its
+  refusal text (no fullscreen layout, terminal under 110 columns) is shown as a toast.
+  Without it the band's own Files pane opens as before. Another plugin's pane can't be
+  listed or closed, so the button opens or refocuses filetree rather than toggling it.
+  Why: asked to use filetree when present.
+- `install.manifest`: a tip says so. `register.test.ts`: both paths tested.

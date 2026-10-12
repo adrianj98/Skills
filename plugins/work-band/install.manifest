@@ -11,5 +11,6 @@ mod    mods/work-band    the mod folder, registered in CLAUDE_CODE_PLUGIN_DIRS
 
 tip  /wb                  toggles the band
 tip  click a pane title   opens the PR checks, the files or the server logs beside the transcript
+tip  Files                opens the filetree mod's pane when that mod is installed, else the band's own
 
 note  the band's remembered port and other $.store values were left alone

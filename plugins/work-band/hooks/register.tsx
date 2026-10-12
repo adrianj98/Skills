@@ -370,7 +370,24 @@ async function isFilesOpen($: EngineInterface) {
   return (await $.ui.panes()).some(pane => pane.id === FILES_PANE)
 }
 
+// The filetree mod (data-goblin/claude-code-filetree), when it is installed:
+// its /filetree command opens its own pane, which this mod can neither list
+// nor close, so the Files button opens or refocuses it rather than toggling.
+async function hasFiletree($: EngineInterface) {
+  try {
+    return (await $.command.list()).some(c => c.name === 'filetree')
+  } catch {
+    return false
+  }
+}
+
 async function toggleFiles($: EngineInterface) {
+  if (await hasFiletree($)) {
+    const { text } = await $.command.run({ command: 'filetree' })
+    // filetree answers a refusal (no fullscreen layout, a narrow terminal) as text.
+    if (text && !/^File tree on /.test(text)) $.ui.toast(text)
+    return
+  }
   if (await isFilesOpen($)) return $.ui.close({ id: FILES_PANE })
   await $.ui.open({ id: FILES_PANE, title: 'Files', closeOnEscape: true })
   await refreshFiles($)
