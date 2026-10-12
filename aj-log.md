@@ -1,5 +1,21 @@
 # aj-log
 
+## 2026-10-12 — work-band mod, `mod` verb in install.sh
+
+- `plugins/work-band/`: the work-band mod copied in from `~/.claude/mods/work-band`
+  (plugin.json, hooks module, tests, state contract, tsconfig). `.claude-plugin/types/` is
+  left out and gitignored: the engine writes it when the mod loads. Why: the mod lived only
+  on this machine; the repo is where the other plugins are kept and installed from.
+- `install.sh`: new `mod <dest> <desc>` manifest verb. Copies the plugin folder whole into
+  `<install root>/<dest>` (minus the manifest and the engine's types) and adds that path to
+  `env.CLAUDE_CODE_PLUGIN_DIRS` in `~/.claude/settings.json`, keeping the entries already
+  there. `--uninstall` removes both. Why: a mod is loaded as a folder from that env var, not
+  file by file through hooks in settings.json, so neither `file` nor `hook` fit. The env var
+  is read only from the global settings, so a `--local` install registers its absolute path
+  there. With no clone, the folder comes out of the repo's tarball, the owner/repo/ref read
+  off `SKILLS_RAW`.
+- Registered in `marketplace.json`, `plugins/index`, root README.
+
 ## 2026-10-12 — progress plugin
 
 - `plugins/progress/`: new `/progress` skill. Two sections: what the PR/branch is about, then

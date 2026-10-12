@@ -124,6 +124,21 @@ claude plugin install caveman@adrianj98-skills
 
 [Full README →](plugins/caveman/README.md)
 
+### [`work-band`](plugins/work-band) · v0.1.0
+
+A mod, not a skill: a hooks module that draws a band above the prompt. It shows the checked-out
+branch's PR and its checks, the Jira issue the branch names and its status, and the lines added
+and removed against the PR's base. Clicking opens a pane beside the transcript: the checks (with
+a re-run button), the changed files as a tree, or the dev server's logs. In alertd-core a button
+starts or restarts `turbo run serve` and remembers the port. `/wb` hides and shows the band.
+
+```bash
+claude plugin install work-band@adrianj98-skills
+```
+
+Or `./install.sh work-band --global`, which copies the folder to `~/.claude/mods/work-band` and
+adds it to `CLAUDE_CODE_PLUGIN_DIRS` in `~/.claude/settings.json`.
+
 ## Installing without the plugin system
 
 `install.sh` copies a plugin's files into `~/.claude/` or a repo's `.claude/`, rewrites its

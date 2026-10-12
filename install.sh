@@ -19,7 +19,8 @@
 # What each plugin installs is described by its own plugins/<name>/install.manifest,
 # so this script stays generic: it never mentions a specific plugin. Not everything
 # installable is a plugin — a manifest can also just seed a file (see the `personal` verb),
-# or pull skills straight from someone else's GitHub repo (see the `remote` verb).
+# or pull skills straight from someone else's GitHub repo (see the `remote` verb), or be a mod,
+# a hooks module Claude loads whole from CLAUDE_CODE_PLUGIN_DIRS (see the `mod` verb).
 set -uo pipefail
 
 # Override to install from a fork or a branch: SKILLS_RAW=https://raw.githubusercontent.com/you/Skills/dev
@@ -260,6 +261,36 @@ remotes() { body | awk '
   function rest(n,  s,i) { s=""; for (i=n;i<=NF;i++) s = s (i>n ? " " : "") $i; return s }
   $1=="remote" { print $2"\t"$3"\t"$4"\t"rest(5) }'; }
 
+# mod <dest> <desc...> — copy the plugin folder whole into <install root>/<dest> and add that
+# path to env.CLAUDE_CODE_PLUGIN_DIRS in ~/.claude/settings.json, which is the one place Claude
+# reads it from (never a project's settings): a mod installed --local still registers there,
+# by absolute path. The engine's own .claude-plugin/types/ is not copied; it rewrites it.
+mods() { body | awk '
+  function rest(n,  s,i) { s=""; for (i=n;i<=NF;i++) s = s (i>n ? " " : "") $i; return s }
+  $1=="mod" { print $2"\t"rest(3) }'; }
+MOD_SETTINGS="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/settings.json"
+# What goes into CLAUDE_CODE_PLUGIN_DIRS for a folder: ~ for the home directory, else absolute.
+mod_ref() { case "$1" in "$HOME"/*) printf '~%s' "${1#$HOME}" ;; *) printf '%s' "$1" ;; esac; }
+# plugin_dirs add|remove <path>: edit the env block, keeping every other entry.
+plugin_dirs() {
+  command -v python3 >/dev/null 2>&1 || { say "  python3 not found — $1 '$2' in env.CLAUDE_CODE_PLUGIN_DIRS of $MOD_SETTINGS yourself"; return 0; }
+  run "python3 - '$MOD_SETTINGS' '$1' '$2' <<'PY'
+import json,sys,pathlib,os
+path,op,entry=sys.argv[1],sys.argv[2],sys.argv[3]
+p=pathlib.Path(path); p.parent.mkdir(parents=True,exist_ok=True)
+try: d=json.loads(p.read_text())
+except Exception: d={}
+env=d.setdefault('env',{})
+dirs=[x for x in env.get('CLAUDE_CODE_PLUGIN_DIRS','').split(os.pathsep) if x]
+if op=='add' and entry not in dirs: dirs.append(entry)
+if op=='remove': dirs=[x for x in dirs if x!=entry]
+if dirs: env['CLAUDE_CODE_PLUGIN_DIRS']=os.pathsep.join(dirs)
+else: env.pop('CLAUDE_CODE_PLUGIN_DIRS',None)
+if not env: d.pop('env',None)
+p.write_text(json.dumps(d,indent=2)+chr(10))
+PY"
+}
+
 # The unpacked repo's directory on stdout. Without @ref it is the default branch.
 fetch_repo() {
   local repo="${1%@*}" ref="HEAD" dir
@@ -342,6 +373,14 @@ PY"
   done <<EOL
 $(payload)
 EOL
+  while IFS="$(printf '\t')" read -r dest desc; do
+    [ -n "$dest" ] || continue
+    [ -d "$ROOT/$dest" ] && { run "rm -rf '$ROOT/$dest'"; say "  removed $dest"; }
+    plugin_dirs remove "$(mod_ref "$ROOT/$dest")"
+    say "  unregistered $dest from CLAUDE_CODE_PLUGIN_DIRS in $MOD_SETTINGS"
+  done <<EOL
+$(mods)
+EOL
   if [ -n "$(remotes)" ]; then
     if [ -f "$RECEIPT" ]; then
       keep=""
@@ -378,6 +417,16 @@ if [ "$SRC" != "$LOCAL_PLUGINS/$PLUGIN" ]; then
   done <<EOL
 $(payload)
 EOL
+fi
+
+# A mod without a clone: the whole plugin folder comes out of this repo's tarball, the
+# owner/repo and ref read off REPO_RAW (https://raw.githubusercontent.com/<owner>/<repo>/<ref>).
+if [ "$SRC" != "$LOCAL_PLUGINS/$PLUGIN" ] && [ -n "$(mods)" ]; then
+  spec="$(printf '%s' "$REPO_RAW" | sed -n 's|^https://raw.githubusercontent.com/\([^/]*/[^/]*\)/\(.*\)$|\1@\2|p')"
+  [ -n "$spec" ] || die "cannot fetch a mod from $REPO_RAW: expected https://raw.githubusercontent.com/<owner>/<repo>/<ref>"
+  dir="$(fetch_repo "$spec")" || die "could not download $spec"
+  [ -d "$dir/plugins/$PLUGIN" ] || die "no plugins/$PLUGIN in $spec"
+  rm -rf "$SRC"; cp -R "$dir/plugins/$PLUGIN" "$SRC"
 fi
 
 # ---------- rewrite rules ----------
@@ -476,6 +525,20 @@ EOL
 for n in $ONLY; do
   case " $got " in *" $n "*) ;; *) [ -n "$(remotes)" ] && die "no skill named $n in $PLUGIN (try: install.sh $PLUGIN --list)" ;; esac
 done
+
+# ---------- mods ----------
+while IFS="$(printf '\t')" read -r dest desc; do
+  [ -n "$dest" ] || continue
+  case "/$dest/" in */../*) die "mod dest climbs out of $ROOT: $dest" ;; esac
+  to="$ROOT/$dest"
+  run "rm -rf '$to' && mkdir -p '$(dirname "$to")' && cp -R '$SRC' '$to' && rm -rf '$to/install.manifest' '$to/.claude-plugin/types'"
+  printf '  %-32s %s\n' "$dest" "$desc"
+  plugin_dirs add "$(mod_ref "$to")"
+  printf '  %-32s registered in CLAUDE_CODE_PLUGIN_DIRS\n' "$(basename "$MOD_SETTINGS")"
+  say "$PAD loads when a session starts (or /reload-plugins)"
+done <<EOL
+$(mods)
+EOL
 
 # ---------- register hooks ----------
 if [ -n "$HOOK_CMDS" ]; then

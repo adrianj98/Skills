@@ -10,6 +10,9 @@
 #                                       copy <path> from that GitHub repo into <install root>/<dest>;
 #                                       <path>/* means each directory under it, as <dest>/<name>.
 #                                       install.sh --skill NAME picks one; --list shows them
+#   mod   <dest> <description>          this plugin is a mod: copy its folder whole into
+#                                       <install root>/<dest> and add that path to
+#                                       env.CLAUDE_CODE_PLUGIN_DIRS in ~/.claude/settings.json
 #   tip   <line>                        printed at the end of a successful install
 #   note  <line>                        printed at the end of an uninstall
 

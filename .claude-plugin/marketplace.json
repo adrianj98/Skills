@@ -54,7 +54,7 @@
       "name": "deslop",
       "displayName": "Deslop",
       "source": "./plugins/deslop",
-      "description": "Finds the AI slop in what just changed — restating comments, defensive checks on trusted values, dead abstraction, inflated prose — reports it, and on request cuts it.",
+      "description": "Finds the AI slop in what just changed \u2014 restating comments, defensive checks on trusted values, dead abstraction, inflated prose \u2014 reports it, and on request cuts it.",
       "version": "0.1.0",
       "author": {
         "name": "Adrian Jones",
@@ -76,7 +76,7 @@
       "name": "showmethedata",
       "displayName": "Show Me The Data",
       "source": "./plugins/showmethedata",
-      "description": "Point it at a file, type, table, field or feature and it explains how that data is stored and used — where it lives, its shape across layers and where the shapes drift, who writes it, who reads it, how it moves, and when it dies.",
+      "description": "Point it at a file, type, table, field or feature and it explains how that data is stored and used \u2014 where it lives, its shape across layers and where the shapes drift, who writes it, who reads it, how it moves, and when it dies.",
       "version": "0.1.0",
       "author": {
         "name": "Adrian Jones",
@@ -142,7 +142,7 @@
       "name": "progress",
       "displayName": "Progress",
       "source": "./plugins/progress",
-      "description": "Where a branch and its pull request stand: what it's about, then its state — review, checks, conflicts, what's unpushed, and the one thing left before it merges.",
+      "description": "Where a branch and its pull request stand: what it's about, then its state \u2014 review, checks, conflicts, what's unpushed, and the one thing left before it merges.",
       "version": "0.1.0",
       "author": {
         "name": "Adrian Jones",
@@ -160,6 +160,28 @@
         "github"
       ],
       "category": "productivity"
+    },
+    {
+      "name": "work-band",
+      "displayName": "Work band",
+      "source": "./plugins/work-band",
+      "description": "A band above the prompt with this branch's PR checks, Jira status and changed files, panes for each, and a button that starts or restarts the dev server.",
+      "version": "0.1.0",
+      "author": {
+        "name": "Adrian Jones",
+        "url": "https://github.com/adrianj98"
+      },
+      "repository": "https://github.com/adrianj98/skills",
+      "license": "MIT",
+      "keywords": [
+        "mod",
+        "ui",
+        "band",
+        "pull-request",
+        "jira",
+        "turbo"
+      ],
+      "category": "development"
     }
   ]
 }

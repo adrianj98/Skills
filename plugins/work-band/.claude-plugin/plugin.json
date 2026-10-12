@@ -1,0 +1,1 @@
+{ "name": "work-band", "version": "0.1.0", "description": "Band above the prompt: this branch's PR and Jira status, plus a button that starts or restarts t (turbo serve)", "types": "./types/index.d.ts" }

@@ -1,0 +1,15 @@
+# What ../../install.sh copies when someone installs this plugin without the plugin system.
+# Verbs are documented in ../adversarial-review/install.manifest.
+#
+# This plugin is a mod: a hooks module that draws a band above the prompt. A mod is not
+# copied file by file; the whole folder is, and Claude loads it from CLAUDE_CODE_PLUGIN_DIRS.
+
+name   Work band
+about  Band above the prompt: this branch's PR checks, Jira status and files, with a button that restarts the dev server.
+
+mod    mods/work-band    the mod folder, registered in CLAUDE_CODE_PLUGIN_DIRS
+
+tip  /wb                  toggles the band
+tip  click a pane title   opens the PR checks, the files or the server logs beside the transcript
+
+note  the band's remembered port and other $.store values were left alone
