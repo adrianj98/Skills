@@ -52,7 +52,7 @@ export const firstRowWidth = (parts: { pr: Pr | null; diff: DiffStat | null; jir
   const prText = p
     ? `PR #${p.number} ${p.isDraft ? 'draft' : p.state} · ${diffText} · ✓${p.passed} ✗${p.failed} …${p.pending}`
     : `no PR · ${diffText}`
-  const jiraText = j ? `${j.key} ${'title' in j ? j.title : j.error}` : 'no Jira key'
+  const jiraText = j ? `${j.key} ${'title' in j ? `${j.status ? `${j.status} ` : ''}${j.title}` : j.error}` : 'no Jira key'
   return prText.length + 3 + jiraText.length + parts.serve.length + (parts.plan ? 3 + parts.plan.length : 0)
 }
 
@@ -69,6 +69,49 @@ export const parseJiraTitle = (text: string): string | undefined => {
   } catch {
     return raw
   }
+}
+// The issue's status name from getJiraIssue's JSON: `"status":{...,"name":"To Do",...}`.
+export const parseJiraStatus = (text: string): string | undefined => {
+  const raw = text.match(/"status"\s*:\s*\{[^{}]*?"name"\s*:\s*"((?:[^"\\]|\\.)*)"/)?.[1]
+  if (!raw) return undefined
+  try {
+    return JSON.parse(`"${raw}"`) as string
+  } catch {
+    return raw
+  }
+}
+
+// The common Jira statuses by name; any other is its words' initials, or
+// its first four letters when it is one word.
+const STATUS_ABBREVIATIONS: Record<string, string> = {
+  'to do': 'TODO',
+  'in progress': 'PROG',
+  'in review': 'REV',
+  'code review': 'REV',
+  'in testing': 'TEST',
+  'ready for review': 'RFR',
+  'ready for test': 'RFT',
+  'ready for dev': 'RFD',
+  'selected for development': 'SEL',
+  backlog: 'BKLG',
+  blocked: 'BLKD',
+  'on hold': 'HOLD',
+  done: 'DONE',
+  closed: 'CLSD',
+  resolved: 'RSLV',
+  reopened: 'REOP',
+  open: 'OPEN',
+  cancelled: 'CANC',
+  canceled: 'CANC',
+}
+
+export const abbreviateStatus = (name: string): string => {
+  const words = name.trim().split(/\s+/).filter(Boolean)
+  if (words.length === 0) return ''
+  const known = STATUS_ABBREVIATIONS[words.join(' ').toLowerCase()]
+  if (known) return known
+  if (words.length > 1) return words.map(w => w.charAt(0)).join('').toUpperCase()
+  return words[0]!.slice(0, 4).toUpperCase()
 }
 const JIRA_SITE = 'alertd.atlassian.net'
 
@@ -517,7 +560,7 @@ async function refreshJira($: EngineInterface, current: Pr | null) {
     await update($, jira, (): Jira => ({ key, error: 'no Jira MCP connected' }))
     return
   }
-  const input = { tool, cloudId: JIRA_SITE, issueIdOrKey: key, fields: ['summary'] }
+  const input = { tool, cloudId: JIRA_SITE, issueIdOrKey: key, fields: ['summary', 'status'] }
   // A refresh every two minutes must never open a permission dialog.
   const { decision } = await $.tool.check({ tool, input })
   if (decision !== 'allow') {
@@ -527,7 +570,9 @@ async function refreshJira($: EngineInterface, current: Pr | null) {
   const result = await $.tool.call(input as never)
   const text = 'text' in result && typeof result.text === 'string' ? result.text : ''
   const title = parseJiraTitle(text)
-  await update($, jira, (): Jira => (title ? { key, title } : { key, error: 'no title' }))
+  const statusName = parseJiraStatus(text)
+  const status = statusName ? abbreviateStatus(statusName) : undefined
+  await update($, jira, (): Jira => (title ? (status ? { key, title, status } : { key, title }) : { key, error: 'no title' }))
 }
 
 async function checkRepo($: EngineInterface) {
@@ -1040,10 +1085,18 @@ export const register: Register = on => {
           <Text bold>{j.key}</Text>
         </Button>,
         'title' in j ? (
-          <Text key="jira-title" dimColor wrap="truncate-end">
-            {' '}
-            {j.title}
-          </Text>
+          [
+            j.status ? (
+              <Text key="jira-state">
+                {' '}
+                {j.status}
+              </Text>
+            ) : null,
+            <Text key="jira-title" dimColor wrap="truncate-end">
+              {' '}
+              {j.title}
+            </Text>,
+          ]
         ) : (
           <Text key="jira-status" dimColor>
             {' '}
@@ -1069,9 +1122,15 @@ export const register: Register = on => {
           <Button key="jira" plain label={j.key} onPress={() => openUrl($, jiraUrl(j.key))}>
             <Text bold>{j.key}</Text>
           </Button>
+          {j.status ? (
+            <Text key="jira-state">
+              {' '}
+              {j.status}
+            </Text>
+          ) : null}
           <Text key="jira-title" dimColor wrap="truncate-end">
             {' '}
-            {fitWidth(j.title, e.props.bodyColumns - j.key.length - 1)}
+            {fitWidth(j.title, e.props.bodyColumns - j.key.length - 1 - (j.status ? j.status.length + 1 : 0))}
           </Text>
         </Box>
       ) : null

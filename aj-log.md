@@ -89,3 +89,13 @@
   listed or closed, so the button opens or refocuses filetree rather than toggling it.
   Why: asked to use filetree when present.
 - `install.manifest`: a tip says so. `register.test.ts`: both paths tested.
+- `register.tsx`, `types/index.d.ts`: the band shows the Jira issue's status, abbreviated,
+  between the key and the title: `AL-4169 TODO MATEOAS: route tables`. getJiraIssue is asked
+  for `status` as well as `summary`; `parseJiraStatus` reads the status's own name (not its
+  category's), and `abbreviateStatus` maps the common names (To Do → TODO, In Progress → PROG,
+  In Review → REV, Done, Backlog → BKLG, Blocked → BLKD, ...) and otherwise takes a multi-word
+  name's initials or a single word's first four letters. The status is drawn plain, between
+  the bold key and the dim title, on the first row and on the issue's own row, and the
+  own-row cut and `firstRowWidth` account for it. Why: asked for an abbreviated Jira status.
+- `register.test.ts`: tests for the status parse, the abbreviations, the measure and both
+  layouts with a status; the installed copy in `~/.claude/mods/work-band` was updated too.

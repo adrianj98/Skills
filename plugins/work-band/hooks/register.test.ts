@@ -20,6 +20,8 @@ import {
   fitWidth,
   firstRowWidth,
   parseDry,
+  abbreviateStatus,
+  parseJiraStatus,
   parseJiraTitle,
   pickJiraTool,
   taskOfLine,
@@ -312,7 +314,7 @@ for (const surface of ['terminal', 'desktop'] as const) {
     const ui = await mountBand($, surface)
     const row = (await ui.findAll({ type: 'Box' }))[1]!.text
     expect(row).toContain('PR #2902 open')
-    expect(row).toContain('AL-4169 MATEOAS: route tables, apiPage helper')
+    expect(row).toContain('AL-4169 TODO MATEOAS: route tables, apiPage helper')
     expect(await ui.find({ type: 'Link' })).toBeUndefined()
     await ui.press({ key: 'jira' })
     expect(opened('https://alertd.atlassian.net/browse/AL-4169')).toBe(true)
@@ -327,10 +329,35 @@ test('the title is the summary field, JSON escapes undone', () => {
   expect(parseJiraTitle('{"fields":{"status":{"name":"To Do"}}}')).toBe(undefined)
 })
 
+test('the status is the status field\'s name, as Jira nests it', () => {
+  expect(
+    parseJiraStatus(
+      '{"fields":{"summary":"x","status":{"self":"https://x/status/3","description":"","iconUrl":"","name":"In Progress","id":"3","statusCategory":{"id":4,"name":"In Progress"}}}}',
+    ),
+  ).toBe('In Progress')
+  expect(parseJiraStatus('{"fields":{"status":{"name":"S\\u00e9lection"}}}')).toBe('Sélection')
+  expect(parseJiraStatus('{"fields":{"summary":"no status here"}}')).toBe(undefined)
+})
+
+test('a status abbreviates to a short tag', () => {
+  expect(abbreviateStatus('To Do')).toBe('TODO')
+  expect(abbreviateStatus('In Progress')).toBe('PROG')
+  expect(abbreviateStatus('in review')).toBe('REV')
+  expect(abbreviateStatus('Done')).toBe('DONE')
+  expect(abbreviateStatus('Backlog')).toBe('BKLG')
+  // Unknown: initials when several words, else the first four letters.
+  expect(abbreviateStatus('Waiting for Customer')).toBe('WFC')
+  expect(abbreviateStatus('Triage')).toBe('TRIA')
+  expect(abbreviateStatus('  ')).toBe('')
+})
+
 test('the first row is measured as drawn; a title is cut to a width with an ellipsis', () => {
   const pr = { number: 2902, state: 'open', isDraft: false, passed: 1, failed: 0, pending: 0 } as never
   expect(firstRowWidth({ pr, diff: null, jira: { key: 'AL-1', title: 'Short' }, serve: '   [ server :1776 ^ ]', plan: 'Max' })).toBe(
     'PR #2902 open · diff · ✓1 ✗0 …0'.length + 3 + 'AL-1 Short'.length + '   [ server :1776 ^ ]'.length + '   Max'.length,
+  )
+  expect(firstRowWidth({ pr, diff: null, jira: { key: 'AL-1', title: 'Short', status: 'PROG' }, serve: '', plan: undefined })).toBe(
+    firstRowWidth({ pr, diff: null, jira: { key: 'AL-1', title: 'Short' }, serve: '', plan: undefined }) + 'PROG '.length,
   )
   expect(firstRowWidth({ pr: null, diff: { added: 4, removed: 2, base: 'develop' }, jira: null, serve: '', plan: undefined })).toBe(
     'no PR · +4 −2 vs develop   no Jira key'.length,
@@ -346,13 +373,15 @@ for (const surface of ['terminal', 'desktop'] as const) {
     on('tool.list', () => ({ value: [{ name: 'mcp__claude_ai_Atlassian_Rovo__getJiraIssue', description: '', mcp: true }] }) as never)
     on('tool.check', () => ({ decision: 'allow' }) as never)
     on('tool.call', (_$, e, next) =>
-      e.tool === 'mcp__claude_ai_Atlassian_Rovo__getJiraIssue' ? ({ result: {}, text: JSON.stringify({ fields: { summary: title } }) } as never) : next(e),
+      e.tool === 'mcp__claude_ai_Atlassian_Rovo__getJiraIssue'
+        ? ({ result: {}, text: JSON.stringify({ fields: { summary: title, status: { name: 'In Progress' } } }) } as never)
+        : next(e),
     )
     await startIn($, on, 'git@github.com:alert-d/alertd-core.git', PR_WITH_KEY, mock.clock(on), true)
-    // Wide enough: two rows, the title whole on the first.
+    // Wide enough: two rows, the status and title whole on the first.
     let ui = await mountBand($, surface, 200)
     let rows = await ui.findAll({ type: 'Box' })
-    expect(rows[1]!.text).toContain(`AL-4169 ${title}`)
+    expect(rows[1]!.text).toContain(`AL-4169 PROG ${title}`)
     expect(rows.length).toBe(2)
     // Too narrow: the issue moves to its own row, cut to 60 cells, and the
     // first row keeps the PR and the server control.
@@ -362,7 +391,7 @@ for (const surface of ['terminal', 'desktop'] as const) {
     expect(rows[1]!.text).not.toContain('AL-4169')
     expect(rows[1]!.text).toContain('PR #1 open')
     expect(rows[1]!.text).toContain('[ server :1776 ^ ]')
-    expect(rows[2]!.text).toBe(`AL-4169 ${title.slice(0, 60 - 'AL-4169 '.length - 1)}…`)
+    expect(rows[2]!.text).toBe(`AL-4169 PROG ${title.slice(0, 60 - 'AL-4169 PROG '.length - 1)}…`)
     expect(rows[2]!.text.length).toBe(60)
     await ui.press({ key: 'jira' })
     expect(opened('https://alertd.atlassian.net/browse/AL-4169')).toBe(true)
