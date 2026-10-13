@@ -612,6 +612,10 @@ async function changeJiraStatus($: EngineInterface) {
     return
   }
   const got = await $.tool.call({ tool: list, cloudId: JIRA_SITE, issueIdOrKey: j.key } as never)
+  if ('deny' in got) {
+    $.ui.toast(`Could not list ${j.key}'s statuses: ${got.deny}`)
+    return
+  }
   const all = parseTransitions('text' in got && typeof got.text === 'string' ? got.text : '')
   const options = all.filter(t => abbreviateStatus(t.to) !== j.status)
   if (options.length === 0) {

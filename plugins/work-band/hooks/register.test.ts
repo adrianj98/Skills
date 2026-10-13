@@ -502,6 +502,27 @@ test('clicking the status lists the other statuses and moves the issue to the on
   expect((await ui.findAll({ type: 'Box' }))[1]!.text).toContain('AL-4169 QA Routes')
 })
 
+test('a refused transitions call says why, rather than offering nothing', async ($, on) => {
+  const toasts: string[] = []
+  const R = 'mcp__claude_ai_Atlassian_Rovo__'
+  on('ui.toast', (_$, e) => {
+    toasts.push(e.text)
+    return { value: undefined } as never
+  })
+  on('tool.list', () => ({ value: ['getJiraIssue', 'getTransitionsForJiraIssue', 'transitionJiraIssue'].map(n => ({ name: R + n, description: '', mcp: true })) }) as never)
+  on('tool.check', () => ({ decision: 'allow' }) as never)
+  on('tool.call', (_$, e, next) => {
+    const t = e.tool as string
+    if (t === R + 'getJiraIssue') return { result: {}, text: JSON.stringify({ fields: { summary: 'Routes', status: { name: 'To Do' } } }) } as never
+    if (t === R + 'getTransitionsForJiraIssue') return { deny: 'denied by auto mode' } as never
+    return next(e)
+  })
+  await startIn($, on, 'git@github.com:alert-d/alertd-core.git', PR_WITH_KEY, mock.clock(on), true)
+  const ui = await mountBand($, 'terminal')
+  await ui.press({ key: 'jira-state' })
+  expect(toasts).toEqual(["Could not list AL-4169's statuses: denied by auto mode"])
+})
+
 test('a line names the task that printed it', () => {
   expect(taskOfLine('//:build:watch: > npm run build -- --watch')).toBe('build:watch')
   expect(taskOfLine('\u001b[2m//:serve:\u001b[0m listening on 1776')).toBe('serve')

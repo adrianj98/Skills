@@ -108,3 +108,6 @@
   their permission dialog. Why: asked to change the status from the band.
 - `register.test.ts`: tests for `parseTransitions`, `transitionPage` and the click-to-move
   flow; the installed copy in `~/.claude/mods/work-band` was updated too.
+- `register.tsx`: when the transitions call is refused (e.g. auto mode denied it with its
+  classifier unavailable) the band toasts the reason instead of "No status changes offered".
+  Why: a click was denied by auto mode and the band showed nothing useful. Test added.
