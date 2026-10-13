@@ -1047,9 +1047,23 @@ for (const surface of ['terminal', 'desktop'] as const) {
   })
 }
 
-test('ports tried: the remembered one, then 1776, 1791, 1792, then 1793 on', () => {
-  expect(candidatePorts(1791).slice(0, 5)).toEqual([1791, 1776, 1792, 1793, 1794])
-  expect(candidatePorts(1776).slice(0, 4)).toEqual([1776, 1791, 1792, 1793])
+test('ports tried: the remembered one, then 1920-1990 in a random order', () => {
+  const all = Array.from({ length: 71 }, (_, i) => 1920 + i)
+  const ports = candidatePorts(1776)
+  expect(ports[0]).toBe(1776)
+  expect([...ports.slice(1)].sort((a, b) => a - b)).toEqual(all)
+  // A remembered port inside the range is not tried twice.
+  const inRange = candidatePorts(1950)
+  expect(inRange[0]).toBe(1950)
+  expect(inRange.length).toBe(71)
+  expect(new Set(inRange).size).toBe(71)
+  // The order follows the random source: a different source, a different order.
+  let seed = 7
+  const lcg = () => ((seed = (seed * 48271) % 2147483647) / 2147483647)
+  const a = candidatePorts(1776, lcg)
+  const b = candidatePorts(1776, () => 0)
+  expect(a).not.toEqual(b)
+  expect(b.slice(1)).not.toEqual(all)
 })
 
 test('a taken port at session start moves the server to the first free one, for this session', async ($, on) => {
@@ -1066,8 +1080,12 @@ test('a taken port at session start moves the server to the first free one, for 
     return taken.has(at) ? '4242\n' : undefined // undefined: lsof exits 1, nothing listening
   })
   const band = await mountBand($, 'terminal')
-  expect((await band.find({ key: 'port' }))?.text).toBe(':1792')
-  expect(toasts).toEqual(['Port 1776 is in use; the server will use 1792'])
+  const text = (await band.find({ key: 'port' }))?.text ?? ''
+  const at = Number(text.slice(1))
+  expect(text).toMatch(/^:19\d\d$/)
+  expect(at).toBeGreaterThanOrEqual(1920)
+  expect(at).toBeLessThanOrEqual(1990)
+  expect(toasts).toEqual([`Port 1776 is in use; the server will use ${at}`])
   expect(store.has('port')).toBe(false)
 })
 

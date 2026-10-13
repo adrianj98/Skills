@@ -284,10 +284,18 @@ export const parsePort = (text: string): number | undefined => {
   return text.trim() !== '' && Number.isInteger(n) && n >= 1 && n <= 65535 ? n : undefined
 }
 
-// The ports tried, in order, when the remembered one is taken.
-export const candidatePorts = (preferred: number): number[] => [
-  ...new Set([preferred, ...PORT_CHOICES.map(Number), ...Array.from({ length: 18 }, (_, i) => 1793 + i)]),
-]
+// The ports tried, in order, when the remembered one is taken: the remembered
+// one first, then 1920-1990 in a random order (`random` is Math.random; a
+// test passes its own).
+export const RANDOM_PORTS = { from: 1920, to: 1990 } as const
+export const candidatePorts = (preferred: number, random: () => number = Math.random): number[] => {
+  const pool = Array.from({ length: RANDOM_PORTS.to - RANDOM_PORTS.from + 1 }, (_, i) => RANDOM_PORTS.from + i)
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1))
+    ;[pool[i], pool[j]] = [pool[j], pool[i]]
+  }
+  return [preferred, ...pool.filter(at => at !== preferred)]
+}
 
 const taskName = (taskId: string) => taskId.replace(/^.*#/, '')
 
@@ -756,8 +764,8 @@ async function isPortTaken($: EngineInterface, at: number) {
   return exitCode === 0 && stdout.trim() !== ''
 }
 
-// At session start: keep the remembered port if it is free, else take the
-// first free candidate for this session (the remembered one stays stored).
+// At session start: keep the remembered port if it is free, else take a
+// random free one in 1920-1990 for this session (the remembered one stays stored).
 async function pickFreePort($: EngineInterface) {
   const preferred = await read($, port)
   for (const at of candidatePorts(preferred)) {

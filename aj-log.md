@@ -111,3 +111,15 @@
 - `register.tsx`: when the transitions call is refused (e.g. auto mode denied it with its
   classifier unavailable) the band toasts the reason instead of "No status changes offered".
   Why: a click was denied by auto mode and the band showed nothing useful. Test added.
+
+## 2026-10-13 — work-band picks a random port
+
+- `plugins/work-band/hooks/register.tsx`: when the remembered port is taken at session
+  start, `candidatePorts` now tries the remembered port and then 1920-1990 in a random order
+  (Fisher-Yates over the range, `Math.random` by default, a test passes its own source),
+  instead of 1776, 1791, 1792, 1793 on in a fixed order. The menu's choices and the 1776
+  default are unchanged. Why: asked that the auto-chosen port be random and in 1920-1990,
+  so two sessions on the same machine stop landing on the same next port.
+- `register.test.ts`: the candidate test checks the range, no duplicates, and that the order
+  follows the random source; the session-start test accepts any port in the range. The
+  installed copy in `~/.claude/mods/work-band` was updated too.
