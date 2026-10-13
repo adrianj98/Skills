@@ -307,7 +307,7 @@ export const candidatePorts = (preferred: number, random: () => number = Math.ra
   const pool = Array.from({ length: RANDOM_PORTS.to - RANDOM_PORTS.from + 1 }, (_, i) => RANDOM_PORTS.from + i)
   for (let i = pool.length - 1; i > 0; i--) {
     const j = Math.floor(random() * (i + 1))
-    ;[pool[i], pool[j]] = [pool[j], pool[i]]
+    ;[pool[i], pool[j]] = [pool[j]!, pool[i]!]
   }
   return [preferred, ...pool.filter(at => at !== preferred)]
 }
@@ -956,7 +956,7 @@ export const register: Register = on => {
   // the model names its topic through set_topic and the band draws it; the
   // file being edited spins in the Files pane, its folders opened.
   on('tool.call', async ($, e, next) => {
-    if (e.tool === TOPIC_TOOL) {
+    if ((e.tool as string) === TOPIC_TOOL) {
       const topics = parseTopics(e)
       if (topics === undefined || topics.length === 0) return { deny: 'set_topic takes { topics: string[] }, one to three short labels' }
       await update($, topic, () => topics)
