@@ -960,7 +960,9 @@ export const register: Register = on => {
       const topics = parseTopics(e)
       if (topics === undefined || topics.length === 0) return { deny: 'set_topic takes { topics: string[] }, one to three short labels' }
       await update($, topic, () => topics)
-      return { result: { topics }, text: `The band shows: ${topicText(topics)}` }
+      // An MCP-named tool's result is checked against MCP's output shape: text.
+      const text = `The band shows: ${topicText(topics)}`
+      return { result: text, text }
     }
     if (!EDIT_TOOLS.has(e.tool)) return next(e)
     const input = e as unknown as { file_path?: string; notebook_path?: string }

@@ -141,3 +141,7 @@
   compose section (added with the tool on offer, not without), the band before and after two
   `set_topic` calls plus a denied one, and the width. The installed copy in
   `~/.claude/mods/work-band` was updated too; a session restart loads it.
+- `register.tsx`: `set_topic` answers its result as text, not `{ topics }`: the engine checks
+  an `mcp__`-named tool's result against MCP's output shape (a string or content blocks) and
+  refused the object (`expected string, received object`), so the call failed in a live
+  session though the tests passed. Test updated; installed copy updated.

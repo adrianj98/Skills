@@ -1093,7 +1093,7 @@ for (const surface of ['terminal', 'desktop'] as const) {
     expect(await row()).toContain('no Jira key   [ server :1776 ^ ]')
 
     const ok = await $.tool.call({ tool: TOPIC_TOOL, topics: ['work-band topic', ' tests '] } as never)
-    expect(ok).toEqual({ result: { topics: ['work-band topic', 'tests'] }, text: 'The band shows: work-band topic · tests' })
+    expect(ok).toEqual({ result: 'The band shows: work-band topic · tests', text: 'The band shows: work-band topic · tests' })
     expect(await row()).toContain('no Jira key   work-band topic · tests   [ server :1776 ^ ]')
 
     await $.tool.call({ tool: TOPIC_TOOL, topics: ['port picking'] } as never)
