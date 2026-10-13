@@ -41,8 +41,8 @@ const SERVE_ARGV = ['npx', 'turbo', 'run', 'serve', '--ui=stream']
 const DRY_ARGV = ['npx', 'turbo', 'run', 'serve', '--dry=json']
 // Whichever Jira MCP server is connected: claude.ai's "Atlassian Rovo", its
 // older "Atlassian", a local `atlassian` server. Every one serves getJiraIssue.
-export const pickJiraTool = (names: readonly string[]): string | undefined =>
-  names.find(n => /^mcp__.+__getJiraIssue$/.test(n))
+export const pickJiraTool = (names: readonly string[], op = 'getJiraIssue'): string | undefined =>
+  names.find(n => new RegExp(`^mcp__.+__${op}$`).test(n))
 
 // Plain text of the band's first row, as wide as it is drawn, so the Jira
 // part can move to a row of its own when the row would not fit `columns`.
@@ -79,6 +79,30 @@ export const parseJiraStatus = (text: string): string | undefined => {
   } catch {
     return raw
   }
+}
+
+// The transitions getTransitionsForJiraIssue offers, unavailable ones left out.
+export const parseTransitions = (text: string): { id: string; name: string; to: string }[] => {
+  try {
+    const raw = (JSON.parse(text) as { transitions?: unknown }).transitions
+    if (!Array.isArray(raw)) return []
+    return raw.flatMap((t: { id?: unknown; name?: unknown; isAvailable?: unknown; to?: { name?: unknown } }) =>
+      typeof t.id === 'string' && typeof t.name === 'string' && t.isAvailable !== false
+        ? [{ id: t.id, name: t.name, to: typeof t.to?.name === 'string' ? t.to.name : t.name }]
+        : [],
+    )
+  } catch {
+    return []
+  }
+}
+
+// The picker holds at most four options: a longer list is shown three at a
+// time with `More…` last, and the final page up to four.
+export const MORE = 'More…'
+export const transitionPage = (names: readonly string[], page: number): string[] => {
+  const start = page * 3
+  const rest = names.slice(start)
+  return rest.length <= 4 ? [...rest] : [...rest.slice(0, 3), MORE]
 }
 
 // The common Jira statuses by name; any other is its words' initials, or
@@ -573,6 +597,53 @@ async function refreshJira($: EngineInterface, current: Pr | null) {
   const statusName = parseJiraStatus(text)
   const status = statusName ? abbreviateStatus(statusName) : undefined
   await update($, jira, (): Jira => (title ? (status ? { key, title, status } : { key, title }) : { key, error: 'no title' }))
+}
+
+// Clicking the status: the issue's transitions in a picker, the chosen one
+// applied, the band refreshed. A click may open the tools' permission dialog.
+async function changeJiraStatus($: EngineInterface) {
+  const j = await read($, jira)
+  if (!j || !('title' in j)) return
+  const names = (await $.tool.list()).map(t => t.name)
+  const list = pickJiraTool(names, 'getTransitionsForJiraIssue')
+  const move = pickJiraTool(names, 'transitionJiraIssue')
+  if (!list || !move) {
+    $.ui.toast('The Jira MCP cannot change statuses')
+    return
+  }
+  const got = await $.tool.call({ tool: list, cloudId: JIRA_SITE, issueIdOrKey: j.key } as never)
+  const all = parseTransitions('text' in got && typeof got.text === 'string' ? got.text : '')
+  const options = all.filter(t => abbreviateStatus(t.to) !== j.status)
+  if (options.length === 0) {
+    $.ui.toast(`No status changes offered for ${j.key}`)
+    return
+  }
+  let choice: string = MORE
+  for (let page = 0; choice === MORE; page++) {
+    try {
+      choice = await $.ui.ask(`Move ${j.key} to which status?`, {
+        header: 'Jira',
+        options: transitionPage(
+          options.map(t => t.name),
+          page,
+        ),
+      })
+    } catch {
+      return // dismissed
+    }
+  }
+  const picked = options.find(t => t.name.toLowerCase() === choice.trim().toLowerCase())
+  if (!picked) {
+    $.ui.toast(`"${choice}" is not a status ${j.key} can move to`)
+    return
+  }
+  const done = await $.tool.call({ tool: move, cloudId: JIRA_SITE, issueIdOrKey: j.key, transition: { id: picked.id } } as never)
+  if ('deny' in done || done.isError) {
+    $.ui.toast(`${j.key} was not moved: ${('deny' in done ? done.deny : done.text) ?? ''}`.trim())
+    return
+  }
+  $.ui.toast(`${j.key} → ${picked.to}`)
+  await refreshJira($, await read($, pr))
 }
 
 async function checkRepo($: EngineInterface) {
@@ -1087,10 +1158,12 @@ export const register: Register = on => {
         'title' in j ? (
           [
             j.status ? (
-              <Text key="jira-state">
-                {' '}
-                {j.status}
-              </Text>
+              <Button key="jira-state" plain label={`Change ${j.key} status`} onPress={() => changeJiraStatus($)}>
+                <Text>
+                  {' '}
+                  {j.status}
+                </Text>
+              </Button>
             ) : null,
             <Text key="jira-title" dimColor wrap="truncate-end">
               {' '}
@@ -1123,10 +1196,12 @@ export const register: Register = on => {
             <Text bold>{j.key}</Text>
           </Button>
           {j.status ? (
-            <Text key="jira-state">
-              {' '}
-              {j.status}
-            </Text>
+            <Button key="jira-state" plain label={`Change ${j.key} status`} onPress={() => changeJiraStatus($)}>
+              <Text>
+                {' '}
+                {j.status}
+              </Text>
+            </Button>
           ) : null}
           <Text key="jira-title" dimColor wrap="truncate-end">
             {' '}

@@ -24,6 +24,9 @@ import {
   parseJiraStatus,
   parseJiraTitle,
   pickJiraTool,
+  parseTransitions,
+  transitionPage,
+  MORE,
   taskOfLine,
   toChecks,
   withoutPrefix,
@@ -431,6 +434,72 @@ test('the band names the tool to allow, and says when no Jira server is connecte
   await clock.advance(120_000)
   ui = await mountBand($, 'terminal')
   expect((await ui.findAll({ type: 'Box' }))[1]!.text).toContain('AL-4169 allow mcp__claude_ai_Atlassian_Rovo__getJiraIssue to show the title')
+})
+
+test('the transitions are read from getTransitionsForJiraIssue, unavailable ones left out', () => {
+  const text = JSON.stringify({
+    transitions: [
+      { id: '11', name: 'To Do', to: { name: 'To Do' } },
+      { id: '21', name: 'Start', to: { name: 'In Progress' } },
+      { id: '9', name: 'Gone', isAvailable: false, to: { name: 'Gone' } },
+    ],
+  })
+  expect(parseTransitions(text)).toEqual([
+    { id: '11', name: 'To Do', to: 'To Do' },
+    { id: '21', name: 'Start', to: 'In Progress' },
+  ])
+  expect(parseTransitions('not json')).toEqual([])
+})
+
+test('a long transition list is paged three at a time with More…', () => {
+  const names = ['a', 'b', 'c', 'd', 'e', 'f', 'g']
+  expect(transitionPage(names, 0)).toEqual(['a', 'b', 'c', MORE])
+  expect(transitionPage(names, 1)).toEqual(['d', 'e', 'f', 'g'])
+  expect(transitionPage(['a', 'b', 'c', 'd'], 0)).toEqual(['a', 'b', 'c', 'd'])
+})
+
+test('clicking the status lists the other statuses and moves the issue to the one picked', async ($, on) => {
+  let status = 'To Do'
+  const moved: unknown[] = []
+  const asked: string[][] = []
+  const answers = [MORE, 'QA']
+  const R = 'mcp__claude_ai_Atlassian_Rovo__'
+  on('ui.toast', () => ({ value: undefined }) as never)
+  on('tool.list', () => ({ value: ['getJiraIssue', 'getTransitionsForJiraIssue', 'transitionJiraIssue'].map(n => ({ name: R + n, description: '', mcp: true })) }) as never)
+  on('tool.check', () => ({ decision: 'allow' }) as never)
+  on('tool.call', { tool: 'AskUserQuestion' }, (_$, e) => {
+    const q = e.questions[0]!
+    asked.push(q.options.map(o => o.label))
+    return { result: { questions: e.questions, answers: { [q.question]: answers.shift()! } } } as never
+  })
+  on('tool.call', (_$, e, next) => {
+    const t = e.tool as string
+    if (t === R + 'getJiraIssue') return { result: {}, text: JSON.stringify({ fields: { summary: 'Routes', status: { name: status } } }) } as never
+    if (t === R + 'getTransitionsForJiraIssue')
+      return {
+        result: {},
+        text: JSON.stringify({
+          transitions: ["Won't Do", 'To Do', 'In Progress', 'Done', 'In Review', 'QA', 'RELEASE QA'].map((name, i) => ({ id: String(i), name, to: { name } })),
+        }),
+      } as never
+    if (t === R + 'transitionJiraIssue') {
+      moved.push((e as unknown as { transition: unknown }).transition)
+      status = 'QA'
+      return { result: {}, text: '' } as never
+    }
+    return next(e)
+  })
+  await startIn($, on, 'git@github.com:alert-d/alertd-core.git', PR_WITH_KEY, mock.clock(on), true)
+  const ui = await mountBand($, 'terminal')
+  expect((await ui.findAll({ type: 'Box' }))[1]!.text).toContain('AL-4169 TODO Routes')
+  await ui.press({ key: 'jira-state' })
+  // To Do, the current status, is not offered.
+  expect(asked).toEqual([
+    ["Won't Do", 'In Progress', 'Done', MORE],
+    ['In Review', 'QA', 'RELEASE QA'],
+  ])
+  expect(moved).toEqual([{ id: '5' }])
+  expect((await ui.findAll({ type: 'Box' }))[1]!.text).toContain('AL-4169 QA Routes')
 })
 
 test('a line names the task that printed it', () => {

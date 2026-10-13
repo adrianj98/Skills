@@ -99,3 +99,12 @@
   own-row cut and `firstRowWidth` account for it. Why: asked for an abbreviated Jira status.
 - `register.test.ts`: tests for the status parse, the abbreviations, the measure and both
   layouts with a status; the installed copy in `~/.claude/mods/work-band` was updated too.
+- `register.tsx`: the Jira status on the band is a button. Clicking it calls
+  getTransitionsForJiraIssue, drops the issue's current status, and shows the rest in a
+  picker (at most four options, so a longer list is three at a time with `More…`; a name
+  typed under Other also works). The picked transition goes to transitionJiraIssue, a toast
+  says `AL-4169 → QA`, and the band re-reads the issue. Both tools are found on whichever
+  Jira MCP is connected (`pickJiraTool` now takes the operation name); the click may open
+  their permission dialog. Why: asked to change the status from the band.
+- `register.test.ts`: tests for `parseTransitions`, `transitionPage` and the click-to-move
+  flow; the installed copy in `~/.claude/mods/work-band` was updated too.
