@@ -123,3 +123,21 @@
 - `register.test.ts`: the candidate test checks the range, no duplicates, and that the order
   follows the random source; the session-start test accepts any port in the range. The
   installed copy in `~/.claude/mods/work-band` was updated too.
+
+## 2026-10-13 — work-band shows Claude's topic
+
+- `plugins/work-band/hooks/register.tsx`: the mod registers a `set_topic` tool
+  (`mcp__work-band__set_topic`, listed from turn one, in front of ToolSearch) that takes one
+  to three short labels; a `prompt.compose` hook appends a session section telling Claude to
+  call it when it starts on something and whenever the topic changes, only when the tool is
+  on offer. The call is answered inside the existing `tool.call` hook (the engine takes one
+  matcher-less hook per event per module), which trims and caps the labels (`parseTopics`),
+  stores them in a `topic` atom and answers `The band shows: a · b`; a bad input is denied with
+  the shape it wants. The band draws the labels in cyan after the Jira part, and
+  `firstRowWidth` counts them when deciding whether Jira takes its own row.
+  Why: asked for the band to show what Claude is working on now, by Claude telling it.
+- `types/index.d.ts`: `topic: string[]` in the contract. `README.md`: one sentence on it.
+- `register.test.ts`: `tool.register` is mocked in `startIn`; tests for `parseTopics`, the
+  compose section (added with the tool on offer, not without), the band before and after two
+  `set_topic` calls plus a denied one, and the width. The installed copy in
+  `~/.claude/mods/work-band` was updated too; a session restart loads it.

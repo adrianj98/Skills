@@ -14,6 +14,12 @@ const isHidden = atom({ plugin: 'work-band', key: 'isHidden' } as const, false)
 const DEFAULT_PORT = 1776
 const PORT_CHOICES = ['1776', '1791', '1792']
 const port = atom({ plugin: 'work-band', key: 'port' } as const, DEFAULT_PORT)
+// What Claude says it is working on now: one to three short labels it sets
+// through the set_topic tool; empty until it does.
+const topic = atom({ plugin: 'work-band', key: 'topic' } as const, [] as string[])
+export const TOPIC_TOOL = 'mcp__work-band__set_topic'
+export const TOPIC_MAX = 3
+export const TOPIC_PROMPT = `The work band above the prompt shows what you are working on. Call ${TOPIC_TOOL} with one to three short labels (two to four words each) when you start on something and whenever the topic changes: a new feature, a different bug, another area of the code. Do not call it when the topic is unchanged.`
 // The Files pane: which view, which folders the person opened (All) or
 // closed (PR, Uncommitted), a tick when the file lists change, and the
 // spinner frame of the file being edited.
@@ -46,15 +52,24 @@ export const pickJiraTool = (names: readonly string[], op = 'getJiraIssue'): str
 
 // Plain text of the band's first row, as wide as it is drawn, so the Jira
 // part can move to a row of its own when the row would not fit `columns`.
-export const firstRowWidth = (parts: { pr: Pr | null; diff: DiffStat | null; jira: Jira | null; serve: string; plan: string | undefined }): number => {
+export const firstRowWidth = (parts: { pr: Pr | null; diff: DiffStat | null; jira: Jira | null; serve: string; plan: string | undefined; topic?: string }): number => {
   const { pr: p, diff: d, jira: j } = parts
   const diffText = d ? `+${d.added} −${d.removed}${p ? '' : ` vs ${d.base}`}` : 'diff'
   const prText = p
     ? `PR #${p.number} ${p.isDraft ? 'draft' : p.state} · ${diffText} · ✓${p.passed} ✗${p.failed} …${p.pending}`
     : `no PR · ${diffText}`
   const jiraText = j ? `${j.key} ${'title' in j ? `${j.status ? `${j.status} ` : ''}${j.title}` : j.error}` : 'no Jira key'
-  return prText.length + 3 + jiraText.length + parts.serve.length + (parts.plan ? 3 + parts.plan.length : 0)
+  return prText.length + 3 + jiraText.length + (parts.topic ? 3 + parts.topic.length : 0) + parts.serve.length + (parts.plan ? 3 + parts.plan.length : 0)
 }
+
+// The labels the model handed set_topic, trimmed, blanks dropped, at most
+// TOPIC_MAX; undefined when the input is not a list of strings.
+export const parseTopics = (input: unknown): string[] | undefined => {
+  const list = (input as { topics?: unknown } | null)?.topics
+  if (!Array.isArray(list) || !list.every(t => typeof t === 'string')) return undefined
+  return (list as string[]).map(t => t.trim()).filter(t => t !== '').slice(0, TOPIC_MAX)
+}
+export const topicText = (topics: readonly string[]): string => topics.join(' · ')
 
 // `text` cut to `width` cells with an ellipsis, whole when it fits.
 export const fitWidth = (text: string, width: number): string =>
@@ -889,6 +904,19 @@ export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     const started = await next(e)
     await $.command.register({ name: 'wb', description: 'Show or hide the PR / Jira / t band', immediate: true })
+    // Listed from turn one, in front of ToolSearch, so the model reaches for it.
+    await $.tool
+      .register({
+        name: 'set_topic',
+        description: 'Show on the work band what you are working on now: one to three short labels. Call it when you start and whenever the topic changes.',
+        inputSchema: {
+          type: 'object',
+          properties: { topics: { type: 'array', items: { type: 'string' }, minItems: 1, maxItems: TOPIC_MAX, description: 'Short labels, two to four words each' } },
+          required: ['topics'],
+        },
+        isDeferred: false,
+      })
+      .catch(() => {})
     void checkRepo($)
     void refreshAccount($).catch(() => {})
     void $.process.run(['git', 'rev-parse', '--show-toplevel']).then(r => {
@@ -914,8 +942,26 @@ export const register: Register = on => {
     return { text: hidden ? 'Work band hidden. /wb shows it again.' : 'Work band shown.' }
   })
 
-  // The file being edited spins in the Files pane, its folders opened.
+  // The model is told the band exists and how to set its topic, when the
+  // tool is on offer.
+  on('prompt.compose', async ($, e, next) => {
+    const { sections } = await next(e)
+    if (!e.tools.includes(TOPIC_TOOL)) return { sections }
+    return { sections: [...sections, { id: 'work-band:topic', text: TOPIC_PROMPT, scope: 'session' }] }
+  })
+
+  // One hook, two jobs (the engine takes one matcher-less tool.call hook per
+  // module, and the tool-name union is laid from this machine's connectors,
+  // not from the mod's own tool, so neither can be a matcher):
+  // the model names its topic through set_topic and the band draws it; the
+  // file being edited spins in the Files pane, its folders opened.
   on('tool.call', async ($, e, next) => {
+    if (e.tool === TOPIC_TOOL) {
+      const topics = parseTopics(e)
+      if (topics === undefined || topics.length === 0) return { deny: 'set_topic takes { topics: string[] }, one to three short labels' }
+      await update($, topic, () => topics)
+      return { result: { topics }, text: `The band shows: ${topicText(topics)}` }
+    }
     if (!EDIT_TOOLS.has(e.tool)) return next(e)
     const input = e as unknown as { file_path?: string; notebook_path?: string }
     const file = input.file_path ?? input.notebook_path
@@ -1094,7 +1140,7 @@ export const register: Register = on => {
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     if (e.props.hasSurvey || (await read($, isHidden))) return next(e)
 
-    const [p, j, s, isServeRepo, at, d, acct] = await Promise.all([
+    const [p, j, s, isServeRepo, at, d, acct, topics] = await Promise.all([
       read($, pr),
       read($, jira),
       read($, serve),
@@ -1102,7 +1148,9 @@ export const register: Register = on => {
       read($, port),
       read($, diffStat),
       read($, account),
+      read($, topic),
     ])
+    const topicLabel = topics.length ? topicText(topics) : undefined
     const { Box, Button, Text } = $.ui.resolve(e)
 
     // A Button cannot sit inside a Text, so the PR part is a list of the
@@ -1200,7 +1248,7 @@ export const register: Register = on => {
     // to the band, so the band is three rows rather than a wrapped one.
     const serveText = isServeRepo ? `   [ server :${at} ^ ]${exitedLabel ? ` ${exitedLabel}` : ''}` : ''
     const jiraOnOwnRow =
-      j !== null && 'title' in j && firstRowWidth({ pr: p, diff: d, jira: j, serve: serveText, plan: acct?.plan }) > e.props.bodyColumns
+      j !== null && 'title' in j && firstRowWidth({ pr: p, diff: d, jira: j, serve: serveText, plan: acct?.plan, topic: topicLabel }) > e.props.bodyColumns
     const jiraRow =
       jiraOnOwnRow && j && 'title' in j ? (
         <Box>
@@ -1228,6 +1276,12 @@ export const register: Register = on => {
           {prPart}
           {jiraOnOwnRow ? null : <Text dimColor>   </Text>}
           {jiraOnOwnRow ? null : jiraPart}
+          {topicLabel ? (
+            <Text key="topic" color="cyan" wrap="truncate-end">
+              {'   '}
+              {topicLabel}
+            </Text>
+          ) : null}
           {isServeRepo ? (
             // `[ server ^ ]`: two chrome-less buttons inside drawn brackets,
             // since one Button is one press target.

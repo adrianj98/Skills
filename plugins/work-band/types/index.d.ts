@@ -52,6 +52,8 @@ declare module 'claude-code' {
       diffStat: DiffStat | null
       rerunAsked: string[]
       account: Account | null
+      // What Claude says it is working on: the labels set_topic was last called with.
+      topic: string[]
     }
   }
 }

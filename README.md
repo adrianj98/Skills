@@ -131,6 +131,8 @@ branch's PR and its checks, the Jira issue the branch names and its status, and 
 and removed against the PR's base. Clicking opens a pane beside the transcript: the checks (with
 a re-run button), the changed files as a tree, or the dev server's logs. In alertd-core a button
 starts or restarts `turbo run serve` and remembers the port. `/wb` hides and shows the band.
+Claude tells the band what it is working on through the mod's `set_topic` tool, and the band draws
+those labels in cyan after the Jira issue.
 
 ```bash
 claude plugin install work-band@adrianj98-skills

@@ -5,6 +5,10 @@ import {
   applyLine,
   parseAuthStatus,
   candidatePorts,
+  parseTopics,
+  topicText,
+  TOPIC_PROMPT,
+  TOPIC_TOOL,
   CHROME_FOCUS_TAB,
   parsePort,
   rerunAll,
@@ -48,6 +52,7 @@ const DRY = JSON.stringify({
 const ran: (readonly string[])[] = []
 const opened = (url: string) => ran.some(a => a[0] === 'open' && a[1] === url)
 
+const registered: string[] = []
 const startIn = async ($: Engine, on: On, origin: string, prJson: string | (() => string) = '', clock = mock.clock(on), ownJira = false, store = new Map<string, unknown>(),
   git?: (argv: readonly string[]) => string | undefined,
 ) => {
@@ -90,6 +95,10 @@ const startIn = async ($: Engine, on: On, origin: string, prJson: string | (() =
   if (!ownJira) on('tool.check', () => ({ decision: 'ask' }) as never)
   on('session.start', (_$, e) => ({ cwd: e.cwd }))
   on('command.register', (_$, e) => ({ value: { command: e.name } }))
+  on('tool.register', (_$, e) => {
+    registered.push(e.name)
+    return { value: { tool: `mcp__work-band__${e.name}` } } as never
+  })
   on('ui.render', () => h('Text', {}, 'engine default') as RenderElement)
   await $.session.start({ cwd: '/repo', surface: null, isInteractive: true })
 }
@@ -1046,6 +1055,57 @@ for (const surface of ['terminal', 'desktop'] as const) {
     expect(ran[1]).toEqual(['open', 'http://localhost:1791'])
   })
 }
+
+test('topics: trimmed, blanks dropped, at most three; not a list is undefined', () => {
+  expect(parseTopics({ topics: [' Jira status ', '', 'port picking'] })).toEqual(['Jira status', 'port picking'])
+  expect(parseTopics({ topics: ['a', 'b', 'c', 'd'] })).toEqual(['a', 'b', 'c'])
+  expect(parseTopics({ topics: 'a' })).toBeUndefined()
+  expect(parseTopics({ topics: ['a', 2] })).toBeUndefined()
+  expect(parseTopics({})).toBeUndefined()
+  expect(topicText(['a', 'b'])).toBe('a · b')
+})
+
+test('the topic prompt section is added when set_topic is on offer, with the engine sections ahead of it', async ($, on) => {
+  on('prompt.compose', () => ({ sections: [{ id: 'intro', text: 'hi', scope: 'shared' }] }))
+  await startIn($, on, 'git@github.com:alert-d/alertd-core.git')
+  expect(registered).toContain('set_topic')
+  const compose = (tools: string[]) =>
+    $.prompt.compose({ model: 'claude-fable-5-1', promptModel: 'claude-fable-5-1', surfaces: [], tools, outputStyle: null, traits: [] })
+  const withTool = await compose(['Bash', TOPIC_TOOL])
+  expect(withTool.sections.map(s => s.id)).toEqual(['intro', 'work-band:topic'])
+  expect(withTool.sections[1]!.text).toBe(TOPIC_PROMPT)
+  expect(withTool.sections[1]!.scope).toBe('session')
+  const without = await compose(['Bash'])
+  expect(without.sections.map(s => s.id)).toEqual(['intro'])
+})
+
+for (const surface of ['terminal', 'desktop'] as const) {
+  test(`set_topic draws the labels on the band, after the Jira part (${surface})`, async ($, on) => {
+    on('tool.list', () => ({ value: [] }) as never)
+    on('tool.check', () => ({ decision: 'allow' }) as never)
+    await startIn($, on, 'git@github.com:alert-d/alertd-core.git', '', mock.clock(on), true)
+    const ui = await mountBand($, surface)
+    const row = async () => (await ui.findAll({ type: 'Box' }))[1]!.text
+    expect(await row()).toContain('no Jira key   [ server :1776 ^ ]')
+
+    const bad = await $.tool.call({ tool: TOPIC_TOOL, topics: 'x' } as never)
+    expect('deny' in bad && bad.deny).toContain('set_topic takes')
+    expect(await row()).toContain('no Jira key   [ server :1776 ^ ]')
+
+    const ok = await $.tool.call({ tool: TOPIC_TOOL, topics: ['work-band topic', ' tests '] } as never)
+    expect(ok).toEqual({ result: { topics: ['work-band topic', 'tests'] }, text: 'The band shows: work-band topic · tests' })
+    expect(await row()).toContain('no Jira key   work-band topic · tests   [ server :1776 ^ ]')
+
+    await $.tool.call({ tool: TOPIC_TOOL, topics: ['port picking'] } as never)
+    expect(await row()).toContain('no Jira key   port picking   [ server :1776 ^ ]')
+  })
+}
+
+test('the topic counts toward the first row, so a long one moves Jira to its own row', () => {
+  const pr = { number: 1, state: 'open', isDraft: false, passed: 1, failed: 0, pending: 0, title: 't' }
+  const base = firstRowWidth({ pr, diff: null, jira: { key: 'AL-1', title: 'Short' }, serve: '', plan: undefined })
+  expect(firstRowWidth({ pr, diff: null, jira: { key: 'AL-1', title: 'Short' }, serve: '', plan: undefined, topic: 'a · b' })).toBe(base + 3 + 'a · b'.length)
+})
 
 test('ports tried: the remembered one, then 1920-1990 in a random order', () => {
   const all = Array.from({ length: 71 }, (_, i) => 1920 + i)
