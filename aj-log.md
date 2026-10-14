@@ -1,5 +1,22 @@
 # aj-log
 
+## 2026-10-14 — work-band re-asks for the topic on every prompt
+
+- `plugins/work-band/hooks/register.tsx`: a `prompt.submit` hook attaches one hidden context
+  line to every prompt the person sends (`topicNudge`): the topic the band shows now, and
+  "if this prompt moves the work to something else, call set_topic first; if it is the same
+  work, leave it", or "no topic yet, call it with what this prompt is about". Meta prompts
+  (engine notices) get nothing. `TOPIC_PROMPT` also says to call it again as one piece of
+  work moves on (designing → building → testing, one bug to the next). Why: the band's
+  topic was set once at session start and never again through a long session; the model
+  heard about the tool once, in the system prompt, and nothing re-prompted it. The nudge is
+  ~35 tokens per prompt at the tail of the transcript, so caching is untouched. A reminder
+  riding on tool results every N calls was considered and left out: it would touch
+  tool-result shapes the engine validates per tool, for a smaller gain.
+- `register.test.ts`: the nudge with and without a topic, attached on a prompt, updated
+  after set_topic, absent on a meta prompt. Installed copy in `~/.claude/mods/work-band`
+  updated; a session restart loads it.
+
 ## 2026-10-14 — greenlight plugin
 
 - `plugins/greenlight/`: new `/greenlight` skill. Runs CI on the repo's default branch on

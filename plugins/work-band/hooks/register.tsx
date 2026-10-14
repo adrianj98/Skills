@@ -19,7 +19,14 @@ const port = atom({ plugin: 'work-band', key: 'port' } as const, DEFAULT_PORT)
 const topic = atom({ plugin: 'work-band', key: 'topic' } as const, [] as string[])
 export const TOPIC_TOOL = 'mcp__work-band__set_topic'
 export const TOPIC_MAX = 3
-export const TOPIC_PROMPT = `The work band above the prompt shows what you are working on. Call ${TOPIC_TOOL} with one to three short labels (two to four words each) when you start on something and whenever the topic changes: a new feature, a different bug, another area of the code. Do not call it when the topic is unchanged.`
+export const TOPIC_PROMPT = `The work band above the prompt shows what you are working on. Call ${TOPIC_TOOL} with one to three short labels (two to four words each) when you start on something and whenever the topic changes: a new feature, a different bug, another area of the code. Call it again as one piece of work moves on: from designing to building, from building to testing, from one bug to the next. Do not call it when the topic is unchanged.`
+// The line attached, unseen, to every prompt the person sends: the topic the
+// band shows now, so the model re-checks it at the moment intent most often
+// changes, instead of hearing about the tool once at session start.
+export const topicNudge = (topics: readonly string[]): string =>
+  topics.length === 0
+    ? `The work band shows no topic yet. Call ${TOPIC_TOOL} with what this prompt is about before anything else.`
+    : `The work band shows: ${topicText(topics)}. If this prompt moves the work to something else, call ${TOPIC_TOOL} before anything else; if it is the same work, leave it.`
 // The Files pane: which view, which folders the person opened (All) or
 // closed (PR, Uncommitted), a tick when the file lists change, and the
 // spinner frame of the file being edited.
@@ -948,6 +955,15 @@ export const register: Register = on => {
     const { sections } = await next(e)
     if (!e.tools.includes(TOPIC_TOOL)) return { sections }
     return { sections: [...sections, { id: 'work-band:topic', text: TOPIC_PROMPT, scope: 'session' }] }
+  })
+
+  // Every prompt the person sends carries the band's topic beside it, so the
+  // model compares and calls set_topic when the work moved. A meta prompt
+  // (an engine notice) is not the person and gets nothing.
+  on('prompt.submit', async ($, e, next) => {
+    if (e.isMeta) return next(e)
+    const nudge = topicNudge(await read($, topic))
+    return next({ ...e, context: [...(e.context ?? []), nudge] })
   })
 
   // One hook, two jobs (the engine takes one matcher-less tool.call hook per

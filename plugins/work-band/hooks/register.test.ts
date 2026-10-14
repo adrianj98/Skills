@@ -9,6 +9,7 @@ import {
   topicText,
   TOPIC_PROMPT,
   TOPIC_TOOL,
+  topicNudge,
   CHROME_FOCUS_TAB,
   parsePort,
   rerunAll,
@@ -1077,6 +1078,33 @@ test('the topic prompt section is added when set_topic is on offer, with the eng
   expect(withTool.sections[1]!.scope).toBe('session')
   const without = await compose(['Bash'])
   expect(without.sections.map(s => s.id)).toEqual(['intro'])
+})
+
+test('every prompt carries a hidden line with the topic the band shows, so the model re-checks it', async ($, on) => {
+  const seen: (readonly string[] | undefined)[] = []
+  on('prompt.submit', (_$, e) => {
+    seen.push(e.context)
+    return { text: e.text } as never
+  })
+  on('tool.list', () => ({ value: [] }) as never)
+  on('tool.check', () => ({ decision: 'allow' }) as never)
+  await startIn($, on, 'git@github.com:alert-d/alertd-core.git', '', mock.clock(on), true)
+
+  expect(topicNudge([])).toBe(`The work band shows no topic yet. Call ${TOPIC_TOOL} with what this prompt is about before anything else.`)
+  expect(topicNudge(['port picking', 'tests'])).toBe(
+    `The work band shows: port picking · tests. If this prompt moves the work to something else, call ${TOPIC_TOOL} before anything else; if it is the same work, leave it.`,
+  )
+
+  await $.prompt.submit({ text: 'fix the port bug' })
+  expect(seen).toEqual([[topicNudge([])]])
+
+  await $.tool.call({ tool: TOPIC_TOOL, topics: ['port picking'] } as never)
+  await $.prompt.submit({ text: 'now the tests' })
+  expect(seen[1]).toEqual([topicNudge(['port picking'])])
+
+  // a prompt the engine marks meta (a notice, not the person) is left alone
+  await $.prompt.submit({ text: 'idle notice', isMeta: true } as never)
+  expect(seen[2]).toBeUndefined()
 })
 
 for (const surface of ['terminal', 'desktop'] as const) {
