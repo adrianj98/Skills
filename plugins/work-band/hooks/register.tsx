@@ -961,7 +961,7 @@ export const register: Register = on => {
   // model compares and calls set_topic when the work moved. A meta prompt
   // (an engine notice) is not the person and gets nothing.
   on('prompt.submit', async ($, e, next) => {
-    if (e.isMeta) return next(e)
+    if ((e as { isMeta?: true }).isMeta) return next(e)
     const nudge = topicNudge(await read($, topic))
     return next({ ...e, context: [...(e.context ?? []), nudge] })
   })
