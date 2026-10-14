@@ -16,8 +16,10 @@ script exits 3 with a `MERGE CONFLICT` block naming the files: the skill has Cla
 them (keeping both sides' intent, asking you when a conflict needs a decision), commit, and
 run it again, which refuses committed conflict markers before pushing. When the branch has
 an open pull request, the push makes GitHub run the PR's checks, and greenlight judges only
-those runs (the workflows that run on `pull_request`), dispatching nothing; without one it
-dispatches the CI workflows itself. On the default
+those runs (the workflows that run on `pull_request`), dispatching nothing except a PR check
+that did not start on its own; without one it dispatches the CI workflows itself. A run in
+which a job was cancelled, skipped or never reached a runner is rerun once, and the new
+attempt is judged; a real failure is never rerun. On the default
 branch itself, or with `--default`, it tests the default branch as it is and touches
 nothing. Then it dispatches every CI workflow on that branch — one that runs on
 `pull_request` or on `push` to branches and has a `workflow_dispatch` trigger — waits for

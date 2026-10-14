@@ -24,7 +24,10 @@
 # is the sha tested (the pushed merge, or the default branch fetched from origin); at least one job matches the integration pattern and inside it
 # no test step was skipped and the log does not report zero tests; every status check the
 # default branch requires (branch protection or rulesets) ran and succeeded; every dispatched
-# workflow actually started. Exit 0 only on GREENLIGHT PASS. It refuses to merge into a branch
+# workflow actually started. A run in which a job was cancelled, skipped or never reached a
+# runner is rerun once and its new attempt judged; a real failure is never rerun. With an
+# open PR, a PR check that did not start on the pushed commit is dispatched when it can be.
+# Exit 0 only on GREENLIGHT PASS. It refuses to merge into a branch
 # with uncommitted changes to tracked files. A merge that conflicts is left in progress and the
 # script exits 3 with a MERGE CONFLICT block listing the files: resolve, commit, run again.
 # Committed conflict markers are refused before pushing. --default never touches the working tree.
@@ -264,11 +267,21 @@ if [ "$PR_MODE" = 1 ]; then
     PENDING=(${LEFT[@]+"${LEFT[@]}"})
     [ ${#PENDING[@]} -eq 0 ] || sleep "$POLL"
   done
-  for i in ${PENDING[@]+"${PENDING[@]}"}; do echo "${WF_FILES[$i]}: no pull request run on $SHORT (its filters may skip this PR)"; done
-  [ ${#RUN_IDS[@]} -gt 0 ] || { reason "no checks ran on pull request #$PR_NUM for $WHERE (waited $((APPEAR_TRIES*POLL))s)"; verdict; }
+  # A PR check that did not start on its own is started here, when it can be dispatched.
+  MISSING=()
+  for i in ${PENDING[@]+"${PENDING[@]}"}; do
+    if [ "$LATEST" = 0 ] && [ "${WF_DISPATCH[$i]}" = 1 ]; then
+      echo "${WF_FILES[$i]}: no pull request run on $SHORT, starting it"; MISSING+=("$i")
+    else
+      echo "${WF_FILES[$i]}: no pull request run on $SHORT (its filters may skip this PR$([ "${WF_DISPATCH[$i]}" = 1 ] || echo '; it has no workflow_dispatch to start it'))"
+    fi
+  done
+  [ ${#RUN_IDS[@]} -gt 0 ] || [ ${#MISSING[@]} -gt 0 ] || { reason "no checks ran on pull request #$PR_NUM for $WHERE (waited $((APPEAR_TRIES*POLL))s)"; verdict; }
+  TODO=(${MISSING[@]+"${MISSING[@]}"})
+else
+  TODO=("${SELECTED[@]}")
 fi
-for i in "${SELECTED[@]}"; do
-  [ "$PR_MODE" = 0 ] || break
+for i in ${TODO[@]+"${TODO[@]}"}; do
   f="${WF_FILES[$i]}"
   if [ "$LATEST" = 1 ]; then
     id="$(gh run list --workflow "$f" --branch "$TARGET" --json databaseId,headSha,status,conclusion,createdAt --limit 30 2>/dev/null \
@@ -304,14 +317,36 @@ fi
 # ---------- wait ----------
 DEADLINE=$(( $(date +%s) + TIMEOUT_MIN*60 ))
 START=$(date +%s)
-DONE=(); LAST=()
-for i in "${!RUN_IDS[@]}"; do DONE+=(0); LAST+=(""); done
+DONE=(); LAST=(); RERUN=()
+for i in "${!RUN_IDS[@]}"; do DONE+=(0); LAST+=(""); RERUN+=(0); done
+# What in a completed run did not run at all (cancelled, skipped, never reached a runner):
+# a rerun usually fixes those, unlike a real failure.
+not_run() {
+  gh run view "$1" --json conclusion,jobs 2>/dev/null | jq -r '
+    ([.jobs[]? | select(.conclusion=="cancelled" or .conclusion=="skipped" or (.conclusion!="success" and ((.steps // []) | length) == 0)) | .name]
+     + (if .conclusion=="cancelled" or .conclusion=="startup_failure" then ["the run itself"] else [] end)) | unique | join(", ")'
+}
 while :; do
   pending=0
   for i in "${!RUN_IDS[@]}"; do
     [ "${DONE[$i]}" = 1 ] && continue
     st="$(gh run view "${RUN_IDS[$i]}" --json status,conclusion 2>/dev/null | jq -r '"\(.status) \(.conclusion // "")"')"
     status="${st%% *}"
+    if [ "$status" = completed ] && [ "${RERUN[$i]}" = 0 ] && missed="$(not_run "${RUN_IDS[$i]}")" && [ -n "$missed" ]; then
+      RERUN[$i]=1
+      attempt="$(gh run view "${RUN_IDS[$i]}" --json attempt 2>/dev/null | jq -r '.attempt // ""')"
+      if err="$(gh run rerun "${RUN_IDS[$i]}" 2>&1)"; then
+        echo "run ${RUN_IDS[$i]} ${RUN_WF[$i]}: did not run $missed; rerunning it once"
+        # wait for the new attempt to show before polling it, so the old one is not judged
+        for ((t=0; t<APPEAR_TRIES; t++)); do
+          now="$(gh run view "${RUN_IDS[$i]}" --json status,attempt 2>/dev/null | jq -r '"\(.status) \(.attempt // "")"')"
+          { [ "${now%% *}" != completed ] || [ "${now#* }" != "$attempt" ]; } && break
+          sleep "$POLL"
+        done
+        pending=1; LAST[$i]=""; continue
+      fi
+      echo "run ${RUN_IDS[$i]} ${RUN_WF[$i]}: did not run $missed; the rerun was refused: $err"
+    fi
     if [ "$status" = completed ]; then
       DONE[$i]=1
       echo "run ${RUN_IDS[$i]} ${RUN_WF[$i]}: completed (${st#* }) after $(( ($(date +%s)-START)/60 ))m$(( ($(date +%s)-START)%60 ))s"

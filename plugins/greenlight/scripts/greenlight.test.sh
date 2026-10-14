@@ -33,6 +33,7 @@ echo "gh $*" >> "$S/calls"
 case "$1 $2" in
   "auth status") exit 0 ;;
   "repo view") cat "$F/repo.json" ;;
+  "run rerun") echo "$3" >> "$S/reruns" ;;
   "pr view") [ -f "$F/pr.json" ] && cat "$F/pr.json" || { echo "no pull requests found for branch" >&2; exit 1; } ;;
   "workflow run")
     wf="$3"
@@ -56,6 +57,10 @@ case "$1 $2" in
     if [ "$log" = 1 ]; then cat "$F/logs/$job.txt" 2>/dev/null; exit 0; fi
     n=0; [ -f "$S/views-$id" ] && n="$(cat "$S/views-$id")"; echo $((n+1)) > "$S/views-$id"
     head="$(git rev-parse HEAD 2>/dev/null)"
+    # after a rerun, the run shows its new attempt (runs/<id>.rerun.json) when the fixture has one
+    if [ -f "$S/reruns" ] && grep -qx "$id" "$S/reruns" && [ -f "$F/runs/$id.rerun.json" ]; then
+      jq -c . "$F/runs/$id.rerun.json" | sed "s/HEAD_OF_CWD/$head/g"; exit 0
+    fi
     if [ -f "$F/slow" ] && [ "$n" = 0 ]; then
       jq -c '. + {status: "in_progress", conclusion: ""}' "$F/runs/$id.json" | sed "s/HEAD_OF_CWD/$head/g"
     else
@@ -267,8 +272,9 @@ run_case "never started" "$d" 1 'never started' --timeout 0
 d="$(fixture snapshot)"; sha="$(make_repo "$d" "$WF")"
 run_json "$sha" success "$JOBS_GOOD" > "$d/runs/100.json"; printf '%s\n' "$LOG_GOOD" > "$d/logs/3.txt"; touch "$d/slow"
 run_case "snapshot" "$d" 0 '^GREENLIGHT PASS'
-# first view: in_progress (poll); second: completed (poll sees it); third: the verifying snapshot
-[ "$(cat "$d/state/views-100")" = 3 ] || { echo "FAIL snapshot: expected 3 views, got $(cat "$d/state/views-100")"; FAIL=$((FAIL+1)); }
+# views: in_progress (poll); completed (poll sees it); did any job not run (no, so no rerun);
+# the verifying snapshot
+[ "$(cat "$d/state/views-100")" = 4 ] || { echo "FAIL snapshot: expected 4 views, got $(cat "$d/state/views-100")"; FAIL=$((FAIL+1)); }
 
 # 19. a job that failed without a single step never reached a runner
 d="$(fixture norunner)"; sha="$(make_repo "$d" "$WF")"
@@ -362,13 +368,39 @@ grep -q -- "--workflow release.yml\|--workflow docs.yml\|--workflow tagrelease.y
 # 29. an open PR whose checks never start on the pushed commit fails
 d="$(branch_fixture bprnone)"; : > "$d/dispatch"
 echo '{"number":7,"url":"https://github.com/o/r/pull/7","baseRefName":"main","state":"OPEN"}' > "$d/pr.json"
-run_case "branch with PR: no checks ran" "$d" 1 "no checks ran on pull request #7"
+run_case "branch with PR: no checks ran, starting one is refused" "$d" 1 "ci.yml: could not dispatch"
 
 # 30. a closed PR does not count; it dispatches as without one
 d="$(branch_fixture bprclosed)"
 echo '{"number":7,"url":"https://github.com/o/r/pull/7","baseRefName":"main","state":"MERGED"}' > "$d/pr.json"
 run_case "branch with a merged PR: dispatches" "$d" 0 "^GREENLIGHT PASS  feature@"
 grep -q "^gh workflow run ci.yml --ref feature" "$d/state/calls" || { echo "FAIL bprclosed: did not dispatch"; FAIL=$((FAIL+1)); }
+
+# 31. an open PR's workflow that did not run on the pushed commit is dispatched
+d="$(branch_fixture bprmissing)"
+echo '{"number":7,"url":"https://github.com/o/r/pull/7","baseRefName":"main","state":"OPEN"}' > "$d/pr.json"
+run_case "branch with PR: a check that did not run is started" "$d" 0 "^GREENLIGHT PASS  feature@"
+grep -q "^gh workflow run ci.yml --ref feature" "$d/state/calls" || { echo "FAIL bprmissing: did not dispatch the missing check"; FAIL=$((FAIL+1)); }
+
+# 32. a run with a job that never ran (cancelled, no steps) is rerun once and the new attempt judged
+d="$(branch_fixture brerun)"
+run_json HEAD_OF_CWD cancelled "$(echo "$JOBS_GOOD" | jq '.[2].conclusion="cancelled" | .[2].steps=[]')" > "$d/runs/100.json"
+run_json HEAD_OF_CWD success "$JOBS_GOOD" > "$d/runs/100.rerun.json"
+run_case "a job that did not run is rerun" "$d" 0 "^GREENLIGHT PASS  feature@"
+grep -q "^gh run rerun 100" "$d/state/calls" || { echo "FAIL brerun: did not rerun"; FAIL=$((FAIL+1)); }
+
+# 33. a rerun that still does not run the job fails, and is not rerun again
+d="$(branch_fixture brerun2)"
+run_json HEAD_OF_CWD cancelled "$(echo "$JOBS_GOOD" | jq '.[2].conclusion="cancelled" | .[2].steps=[]')" > "$d/runs/100.json"
+cp "$d/runs/100.json" "$d/runs/100.rerun.json"
+run_case "a rerun that still skips fails" "$d" 1 'job "integration tests".*cancelled'
+[ "$(grep -c "^gh run rerun" "$d/state/calls")" = 1 ] || { echo "FAIL brerun2: reran more than once"; FAIL=$((FAIL+1)); }
+
+# 34. a real failure is not rerun
+d="$(branch_fixture bnorerun)"
+run_json HEAD_OF_CWD failure "$(echo "$JOBS_GOOD" | jq '.[1].conclusion="failure"')" > "$d/runs/100.json"
+run_case "a failure is not rerun" "$d" 1 'job "unit tests".*failure'
+grep -q "^gh run rerun" "$d/state/calls" && { echo "FAIL bnorerun: reran a real failure"; FAIL=$((FAIL+1)); }
 
 echo
 echo "$PASS passed, $FAIL failed"

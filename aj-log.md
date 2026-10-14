@@ -1,5 +1,17 @@
 # aj-log
 
+## 2026-10-14 — greenlight starts PR checks that did not run and reruns jobs that did not run
+
+- `plugins/greenlight/scripts/greenlight.sh`: with an open PR, a `pull_request` workflow with no
+  run on the pushed commit is dispatched on the branch when it has `workflow_dispatch`. Any run
+  that completes with a job cancelled, skipped or never reaching a runner (or the run itself
+  cancelled or a startup failure) is rerun once with `gh run rerun`; the script waits for the
+  new attempt before polling and judges it. Real failures are never rerun. Why: some checks do
+  not run unless rerun or started by hand.
+- `greenlight.test.sh`: the fake `gh` answers `run rerun` and then serves `runs/<id>.rerun.json`;
+  cases for a missing PR check being dispatched, a rerun that fixes it, a rerun that does not
+  (one rerun only), and a real failure not rerun. 40 pass.
+
 ## 2026-10-14 — greenlight judges the pull request's own checks
 
 - `plugins/greenlight/scripts/greenlight.sh`: in branch mode, when the branch has an open pull
