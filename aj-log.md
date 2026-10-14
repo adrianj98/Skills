@@ -1,5 +1,38 @@
 # aj-log
 
+## 2026-10-14 — greenlight plugin
+
+- `plugins/greenlight/`: new `/greenlight` skill. Runs CI on the repo's default branch on
+  GitHub Actions, integration tests included, and prints `GREENLIGHT PASS` or `GREENLIGHT
+  FAIL` with reasons. Why: asked for a skill that pulls the default branch and runs CI with
+  the integration tests, with a script so the AI cannot assume the tests passed. CI runs on
+  Actions rather than locally (chosen when asked), so the script only `git fetch`es the
+  default branch to learn its sha and never pulls, merges or checks out: a dirty or diverged
+  local checkout cannot block it (raised while reviewing the design).
+- `scripts/greenlight.sh`: reads the default branch from `gh repo view`; parses each
+  workflow's `on:` block (an awk pass, since yq isn't a given) so push-to-tags-only and
+  manual-only workflows such as releases are never dispatched unless named; dispatches the
+  CI ones with `gh workflow run`, waits for a new run id to appear (a dispatch that never
+  starts is a FAIL), polls to completion, then takes one final `gh run view --json` snapshot
+  per run and judges only that (asked: the verdict must come from a single call that shows
+  everything passed, not pieced together from polling). Rules: run and every job `success`;
+  run sha equals the fetched sha; an integration-pattern job exists, none of its test steps
+  skipped, its log doesn't report zero tests; every required status check from branch
+  protection and rulesets ran and succeeded (asked: make sure all required are started); a
+  job that failed with zero steps is reported as never reaching a runner, quoting GitHub's
+  annotation. `--latest` judges the newest completed runs on the sha instead of dispatching;
+  a workflow whose triggers didn't fire for that commit is a note, not a FAIL, unless named.
+  Default integration pattern widened to `functional|acceptance` after real repos used those.
+- `scripts/greenlight.test.sh`: 21 cases against a fake `gh` on PATH answering from fixture
+  dirs, each in a throwaway git repo with an origin and a dirty, diverged checkout.
+- Real runs: `--latest` on driveday_arduino and open-atc; a live dispatch of `functional` on
+  driveday_arduino, which FAILed because GitHub did not start the jobs ("recent account
+  payments have failed or your spending limit needs to be increased"), which is what led to
+  the zero-steps reason and the annotation quote.
+- SKILL.md is a recipe (verdict line verbatim first, reasons as bullets, integration jobs
+  from the table) with the no-verdict case spelled out as "did not complete". Registered in
+  `marketplace.json`, `plugins/index`, root README; `install.manifest` for `install.sh greenlight`.
+
 ## 2026-10-12 — work-band mod, `mod` verb in install.sh
 
 - `plugins/work-band/`: the work-band mod copied in from `~/.claude/mods/work-band`

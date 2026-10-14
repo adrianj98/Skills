@@ -182,6 +182,28 @@
         "turbo"
       ],
       "category": "development"
+    },
+    {
+      "name": "greenlight",
+      "displayName": "Greenlight",
+      "source": "./plugins/greenlight",
+      "description": "Runs CI on the default branch on GitHub Actions, integration tests included, and prints a PASS/FAIL verdict from one final snapshot of every job, so the model reports what ran rather than what it assumes.",
+      "version": "0.1.0",
+      "author": {
+        "name": "Adrian Jones",
+        "url": "https://github.com/adrianj98"
+      },
+      "repository": "https://github.com/adrianj98/skills",
+      "license": "MIT",
+      "keywords": [
+        "ci",
+        "github-actions",
+        "integration-tests",
+        "verification",
+        "default-branch",
+        "workflow_dispatch"
+      ],
+      "category": "development"
     }
   ]
 }

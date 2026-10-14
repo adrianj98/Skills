@@ -1,0 +1,16 @@
+# What ../../install.sh copies when someone installs this plugin without the plugin system.
+# Verbs are documented in ../adversarial-review/install.manifest.
+
+name   Greenlight
+about  Runs CI on the default branch on GitHub Actions, integration tests included, and prints a PASS/FAIL verdict the model copies rather than infers.
+
+file   skills/greenlight/SKILL.md  skills/greenlight/SKILL.md       /greenlight
+file   scripts/greenlight.sh       skills/greenlight/greenlight.sh  dispatches, waits, snapshots, judges
+
+# Outside the plugin system there is no ${CLAUDE_PLUGIN_ROOT} and no /plugin:skill namespace.
+rewrite  ${CLAUDE_PLUGIN_ROOT}/scripts/greenlight.sh  @ROOT@/skills/greenlight/greenlight.sh
+rewrite  /greenlight:greenlight                       /greenlight
+
+tip  /greenlight                   dispatch every CI workflow on the default branch and judge the runs
+tip  /greenlight --latest          judge the newest completed runs on the current sha instead
+tip  /greenlight ci --match e2e    one workflow, and what counts as the integration job

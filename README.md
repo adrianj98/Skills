@@ -124,6 +124,23 @@ claude plugin install caveman@adrianj98-skills
 
 [Full README →](plugins/caveman/README.md)
 
+### [`greenlight`](plugins/greenlight) · v0.1.0
+
+`/greenlight` — run CI on the default branch on GitHub Actions, integration tests included,
+and get a verdict the model can only copy. A script fetches the default branch, dispatches
+every CI workflow on it (never a tag-only or manual-only one unless named), waits, then
+judges one final snapshot per run: every job `success`, the right sha, an integration job
+that ran its test steps and reported tests, every required status check present and green.
+`GREENLIGHT PASS` or `GREENLIGHT FAIL` with reasons; the skill reports that line verbatim and
+output with no verdict as "did not complete". `/greenlight --latest` judges the newest runs
+on the current sha instead of starting new ones.
+
+```bash
+claude plugin install greenlight@adrianj98-skills
+```
+
+[Full README →](plugins/greenlight/README.md)
+
 ### [`work-band`](plugins/work-band) · v0.1.0
 
 A mod, not a skill: a hooks module that draws a band above the prompt. It shows the checked-out
