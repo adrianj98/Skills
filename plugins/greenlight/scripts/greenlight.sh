@@ -23,8 +23,9 @@
 # no test step was skipped and the log does not report zero tests; every status check the
 # default branch requires (branch protection or rulesets) ran and succeeded; every dispatched
 # workflow actually started. Exit 0 only on GREENLIGHT PASS. It refuses to merge into a branch
-# with uncommitted changes to tracked files, and aborts a merge that conflicts; --default never
-# touches the working tree.
+# with uncommitted changes to tracked files. A merge that conflicts is left in progress and the
+# script exits 3 with a MERGE CONFLICT block listing the files: resolve, commit, run again.
+# Committed conflict markers are refused before pushing. --default never touches the working tree.
 #
 # Needs git, gh (logged in) and jq. GREENLIGHT_POLL=<seconds> sets the poll interval (default 30).
 set -uo pipefail
@@ -96,22 +97,33 @@ else
     git merge-base --is-ancestor "$DEFAULT_SHA" "$SHA" || { reason "origin/$CUR@${SHA:0:7} does not contain origin/$BRANCH@${DEFAULT_SHA:0:7}; run without --latest to merge it in and test"; WHERE="$CUR@${SHA:0:7}"; verdict; }
     echo "branch    $CUR  origin/$CUR@${SHA:0:7}  (contains origin/$BRANCH@${DEFAULT_SHA:0:7}; nothing merged or pushed)"
   else
+    [ ! -e "$(git rev-parse --git-path MERGE_HEAD)" ] || { reason "a merge is already in progress on $CUR; resolve the conflicts and commit (or git merge --abort), then run again"; WHERE="$CUR"; verdict; }
     if ! git diff --quiet HEAD -- 2>/dev/null; then
       reason "$CUR has uncommitted changes to tracked files; commit or stash them first, since greenlight merges $BRANCH into $CUR"; verdict
     fi
-    [ ! -e "$(git rev-parse --git-path MERGE_HEAD)" ] || { reason "a merge is already in progress on $CUR; finish or abort it first"; verdict; }
     if git merge-base --is-ancestor "$DEFAULT_SHA" HEAD; then
       echo "merge     $CUR already contains origin/$BRANCH@${DEFAULT_SHA:0:7}"
     elif MERGE_OUT="$(git merge --no-edit "origin/$BRANCH" 2>&1)"; then
       echo "merge     merged origin/$BRANCH@${DEFAULT_SHA:0:7} into $CUR"
     else
-      CONFLICTS="$(git diff --name-only --diff-filter=U 2>/dev/null | paste -sd, - | sed 's/,/, /g')"
+      CONFLICTS="$(git diff --name-only --diff-filter=U 2>/dev/null)"
+      if [ -n "$CONFLICTS" ]; then
+        # Left in progress on purpose: resolving it is the next step, then running again.
+        echo
+        echo "== verdict"
+        echo "MERGE CONFLICT  merging origin/$BRANCH@${DEFAULT_SHA:0:7} into $CUR"
+        printf '%s\n' "$CONFLICTS" | sed 's/^/- conflicted: /'
+        echo "- the merge is left in progress: resolve these files, git add them, git commit --no-edit, then run greenlight again (git merge --abort undoes it)"
+        exit 3
+      fi
       git merge --abort >/dev/null 2>&1
-      if [ -n "$CONFLICTS" ]; then reason "merging origin/$BRANCH into $CUR conflicts in $CONFLICTS; the merge was aborted, resolve it by hand and run again"
-      else reason "merging origin/$BRANCH into $CUR failed: $(printf '%s' "$MERGE_OUT" | tail -1)"; fi
+      reason "merging origin/$BRANCH into $CUR failed: $(printf '%s' "$MERGE_OUT" | tail -1)"
       WHERE="$CUR"; verdict
     fi
     SHA="$(git rev-parse HEAD)"
+    MARKERS="$(git diff --name-only "$DEFAULT_SHA" HEAD 2>/dev/null | while IFS= read -r f; do
+      [ -f "$f" ] && grep -Eq '^(<<<<<<<|>>>>>>>)( |$)|^=======$' "$f" && echo "$f"; done | paste -sd, - | sed 's/,/, /g')"
+    [ -z "$MARKERS" ] || { reason "conflict markers were committed in $MARKERS; fix them and commit before running again (nothing was pushed)"; WHERE="$CUR@${SHA:0:7}"; verdict; }
     PUSH_ERR="$(git push --quiet -u origin "$CUR" 2>&1)" || { reason "git push origin $CUR failed (the merge is kept locally): $(printf '%s' "$PUSH_ERR" | tail -1)"; WHERE="$CUR@${SHA:0:7}"; verdict; }
     echo "branch    $CUR@${SHA:0:7}  (pushed; contains origin/$BRANCH@${DEFAULT_SHA:0:7})"
   fi

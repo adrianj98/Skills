@@ -17,14 +17,43 @@ directories above this skill's base directory: run `scripts/greenlight.sh` from 
 The script asks GitHub which branch is the default (it never assumes `main`) and fetches it.
 On any other branch it merges the default branch into the current branch, pushes the
 result, and dispatches every CI workflow on the current branch, so CI tests the branch as
-it would be after merging. It refuses when tracked files have uncommitted changes, and
-aborts a merge that conflicts. On the default branch itself, or with `--default`, it tests
+it would be after merging. It refuses when tracked files have uncommitted changes. A merge
+that conflicts is left in progress for you to resolve (below). On the default branch itself, or with `--default`, it tests
 the default branch as it is on origin and touches nothing. It waits for the runs, takes one
 final `gh run view` snapshot per run, judges only that, and exits 0 only when its last block
 reads `GREENLIGHT PASS`. `--latest` merges, pushes and dispatches nothing: it verifies the
 newest completed runs on the branch's pushed sha, which must already contain the default
 branch. A workflow name narrows it to that workflow, and is the only way a manual-only
 workflow (a release, say) gets dispatched.
+
+## When the merge conflicts
+
+The script exits 3 and its last block starts `MERGE CONFLICT`, followed by one
+`- conflicted: <file>` line per file. The merge is still in progress. Resolve it, then run
+the script again with the same arguments:
+
+1. For each conflicted file, read both sides and what each side changed:
+   `git diff <file>` for the conflict, and `git log --oneline -5 MERGE_HEAD -- <file>` and
+   `git log --oneline -5 HEAD -- <file>` for why. Keep both sides' intent: the default
+   branch's change and the branch's change usually both have to survive, combined. Never
+   resolve by taking one side wholesale unless the other side's change is clearly superseded.
+2. Remove every conflict marker. Check with `git diff --check`.
+3. When it builds or has fast checks (a type check, a compile, the unit tests near the
+   conflict), run them locally before committing.
+4. `git add` the resolved files and `git commit --no-edit`.
+5. Run the script again. It sees the branch already contains the default branch, refuses
+   committed conflict markers, pushes, and runs CI.
+
+Stop and ask the user, leaving the merge in progress, when a conflict needs a product or
+design decision rather than combining two edits (both sides rewrote the same logic
+differently, one side deleted what the other changed, a migration or a lock file you
+cannot regenerate). Say which files and what each side wants. Never `git merge --abort`,
+reset or force-push on your own.
+
+In the report, list each conflicted file and one line on how it was resolved, before the
+verdict of the run that followed.
+
+## The report
 
 The report is the script's verdict, copied:
 
@@ -44,7 +73,8 @@ The verdict is the script's, so the report is what the script printed:
 - A green jobs table above a `GREENLIGHT FAIL` is still a FAIL. The reasons say why.
 - `--latest` with a FAIL that says no run exists is reported as that; the next step is to run
   it without `--latest`, which the user decides.
-- A merge conflict, uncommitted changes or a refused push is a FAIL before any CI ran; the
-  reason says which, and resolving it is the user's.
+- Uncommitted changes, a merge already in progress, committed conflict markers or a refused
+  push is a FAIL before any CI ran; the reason says which. Uncommitted changes and a refused
+  push are the user's to sort out; a merge you left in progress is yours to finish.
 - No job tagged `[integration]` means the integration tests did not run as far as this
   verdict goes; `--match` names a different job pattern, and the user picks it.

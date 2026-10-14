@@ -11,7 +11,10 @@ claude plugin install greenlight@adrianj98-skills
 The script asks GitHub which branch is the default, so it works whatever that branch is
 called, and fetches it. On any other branch it merges the default branch into the current
 branch and pushes, so CI tests your branch as it would be after merging; it refuses when
-tracked files have uncommitted changes, and aborts a merge that conflicts. On the default
+tracked files have uncommitted changes. A merge that conflicts is left in progress and the
+script exits 3 with a `MERGE CONFLICT` block naming the files: the skill has Claude resolve
+them (keeping both sides' intent, asking you when a conflict needs a decision), commit, and
+run it again, which refuses committed conflict markers before pushing. On the default
 branch itself, or with `--default`, it tests the default branch as it is and touches
 nothing. Then it dispatches every CI workflow on that branch — one that runs on
 `pull_request` or on `push` to branches and has a `workflow_dispatch` trigger — waits for

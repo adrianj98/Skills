@@ -301,14 +301,27 @@ d="$(branch_fixture bstale)"; old="$(git -C "$d/work" rev-parse HEAD)"
 run_json "$old" success "$JOBS_GOOD" > "$d/runs/100.json"
 run_case "branch: a run on the unmerged commit fails" "$d" 1 "${old:0:7}.*not"
 
-# 22. a conflicting merge is aborted and nothing is pushed
+# 22. a conflicting merge is left in progress for resolving, and nothing is pushed
 d="$(branch_fixture bconflict)"
 commit_in "$d/work" main.txt "feature's version"
-before="$(git -C "$d/work" rev-parse HEAD)"
-run_case "branch: merge conflict" "$d" 1 "conflicts in main.txt"
-[ "$(git -C "$d/work" rev-parse HEAD)" = "$before" ] && [ ! -e "$d/work/.git/MERGE_HEAD" ] || { echo "FAIL bconflict: the merge was not aborted"; FAIL=$((FAIL+1)); }
+run_case "branch: merge conflict" "$d" 3 "^- conflicted: main.txt$"
+[ -e "$d/work/.git/MERGE_HEAD" ] || { echo "FAIL bconflict: the merge was not left in progress"; FAIL=$((FAIL+1)); }
 git -C "$d/origin.git" rev-parse --verify --quiet feature >/dev/null && { echo "FAIL bconflict: pushed after a conflict"; FAIL=$((FAIL+1)); }
 grep -q "^gh workflow run" "$d/state/calls" 2>/dev/null && { echo "FAIL bconflict: dispatched after a conflict"; FAIL=$((FAIL+1)); }
+# running again before it is resolved refuses
+run_case "branch: merge still unresolved" "$d" 1 "merge is already in progress"
+# resolved and committed, the next run pushes the merge and tests it
+echo resolved > "$d/work/main.txt"; git -C "$d/work" add main.txt; git -C "$d/work" commit --quiet --no-edit
+run_case "branch: resolved conflict passes" "$d" 0 "^GREENLIGHT PASS  feature@"
+[ "$(git -C "$d/origin.git" rev-parse feature 2>/dev/null)" = "$(git -C "$d/work" rev-parse HEAD)" ] || { echo "FAIL bconflict: the resolved merge was not pushed"; FAIL=$((FAIL+1)); }
+
+# 22b. conflict markers committed by mistake are caught before pushing
+d="$(branch_fixture bmarkers)"
+commit_in "$d/work" main.txt "feature's version"
+run_case "branch: conflict for markers" "$d" 3 "MERGE CONFLICT"
+git -C "$d/work" add main.txt; git -C "$d/work" commit --quiet --no-edit
+run_case "branch: committed conflict markers" "$d" 1 "conflict markers.*main.txt"
+git -C "$d/origin.git" rev-parse --verify --quiet feature >/dev/null && { echo "FAIL bmarkers: pushed conflict markers"; FAIL=$((FAIL+1)); }
 
 # 23. uncommitted changes to tracked files stop it before merging
 d="$(branch_fixture bdirty)"; echo changed > "$d/work/feature.txt"

@@ -1,5 +1,20 @@
 # aj-log
 
+## 2026-10-14 — greenlight leaves a conflicting merge for Claude to resolve
+
+- `plugins/greenlight/scripts/greenlight.sh`: a merge that conflicts is no longer aborted. The
+  script leaves it in progress, prints a `MERGE CONFLICT` block with one `- conflicted: <file>`
+  line per file, and exits 3. A rerun with the merge still in progress is refused; once resolved
+  and committed, the rerun pushes and tests it. Conflict markers committed in files the merge
+  touched are refused before pushing. Why: merges often conflict, and the AI should resolve them
+  rather than stopping.
+- `SKILL.md`: how Claude resolves a conflict (read both sides and their history, keep both
+  intents, no markers, run quick local checks, commit, rerun), when to stop and ask instead
+  (a decision, a delete-versus-edit, a migration or lock file), never abort, reset or force-push
+  on its own, and to list each resolved file in the report.
+- `greenlight.test.sh`: conflict left in progress, an unresolved rerun refused, a resolved
+  rerun passing and pushing, committed markers refused. 33 pass.
+
 ## 2026-10-14 — greenlight merges the default branch into the current branch and tests that
 
 - `plugins/greenlight/scripts/greenlight.sh`: on any branch other than the default one it now
