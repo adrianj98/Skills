@@ -1,23 +1,30 @@
 #!/usr/bin/env bash
-# Run CI on the repo's default branch on GitHub Actions and prove it passed, including the
-# integration tests, with a verdict a model can only copy, not infer.
+# Merge the repo's default branch into the current branch, push it, run CI on it on GitHub
+# Actions and prove it passed, including the integration tests, with a verdict a model can
+# only copy, not infer. On the default branch itself, or with --default, it tests the default
+# branch as it is on origin and touches nothing.
 #
-#   greenlight.sh                   dispatch every CI workflow (one that runs on push or
-#                                   pull_request and has workflow_dispatch) on the default branch
+#   greenlight.sh                   fetch the default branch, merge it into the current branch,
+#                                   push, and dispatch every CI workflow (one that runs on push
+#                                   or pull_request and has workflow_dispatch) on that branch
+#   greenlight.sh --default         test the default branch itself: fetch only, never merge
 #   greenlight.sh ci integration    only those workflows: file name or name:, .yml optional;
 #                                   a manual-only workflow runs only when named like this
-#   greenlight.sh --latest          dispatch nothing; verify the newest completed run of each
-#                                   CI workflow on the default branch's current sha
+#   greenlight.sh --latest          merge, push and dispatch nothing; verify the newest completed
+#                                   run of each CI workflow on the branch's pushed sha, which
+#                                   must already contain the default branch
 #   greenlight.sh --match REGEX     what counts as an integration job
 #                                   (default integration|e2e|end.to.end|functional|acceptance)
 #   greenlight.sh --timeout MIN     how long to wait for the runs (default 45)
 #
 # Verdict rules, all from one `gh run view` snapshot per run taken after every run completed:
 # the run and every job concluded success (skipped, cancelled and neutral fail); the run's sha
-# is the sha fetched from origin; at least one job matches the integration pattern and inside it
+# is the sha tested (the pushed merge, or the default branch fetched from origin); at least one job matches the integration pattern and inside it
 # no test step was skipped and the log does not report zero tests; every status check the
 # default branch requires (branch protection or rulesets) ran and succeeded; every dispatched
-# workflow actually started. Exit 0 only on GREENLIGHT PASS. Never touches the working tree.
+# workflow actually started. Exit 0 only on GREENLIGHT PASS. It refuses to merge into a branch
+# with uncommitted changes to tracked files, and aborts a merge that conflicts; --default never
+# touches the working tree.
 #
 # Needs git, gh (logged in) and jq. GREENLIGHT_POLL=<seconds> sets the poll interval (default 30).
 set -uo pipefail
@@ -25,11 +32,13 @@ set -uo pipefail
 MATCH='integration|e2e|end.to.end|functional|acceptance'
 TIMEOUT_MIN=45
 LATEST=0
+MODE=branch
 WANT=()
 while [ $# -gt 0 ]; do
   case "$1" in
-    -h|--help) sed -n '2,20s/^# \{0,1\}//p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,28s/^# \{0,1\}//p' "$0"; exit 0 ;;
     --latest) LATEST=1 ;;
+    --default) MODE=default ;;
     --match) MATCH="$2"; shift ;;
     --timeout) TIMEOUT_MIN="$2"; shift ;;
     --*) echo "unknown option $1"; exit 2 ;;
@@ -65,13 +74,51 @@ REPO="$(printf '%s' "$REPO_JSON" | jq -r .nameWithOwner)"
 BRANCH="$(printf '%s' "$REPO_JSON" | jq -r .defaultBranchRef.name)"
 [ -n "$BRANCH" ] && [ "$BRANCH" != null ] || { reason "could not read the default branch of $REPO"; verdict; }
 
-# ---------- the default branch, fetched only ----------
+# ---------- the default branch, fetched ----------
 FETCH_ERR="$(git fetch --quiet origin "$BRANCH" 2>&1)" || { reason "git fetch origin $BRANCH failed: $FETCH_ERR"; verdict; }
-SHA="$(git rev-parse "origin/$BRANCH" 2>/dev/null)" || { reason "origin/$BRANCH is not a ref after fetching"; verdict; }
-SHORT="${SHA:0:7}"
-WHERE="$BRANCH@$SHORT"
+DEFAULT_SHA="$(git rev-parse "origin/$BRANCH" 2>/dev/null)" || { reason "origin/$BRANCH is not a ref after fetching"; verdict; }
 echo "repo      $REPO"
-echo "branch    $BRANCH  origin/$BRANCH@$SHORT  (fetched; the working tree is untouched)"
+
+# ---------- what to test: the current branch with the default branch merged in, or the default branch ----------
+CUR="$(git symbolic-ref --quiet --short HEAD 2>/dev/null)"
+if [ "$MODE" = branch ]; then
+  [ -n "$CUR" ] || { reason "not on a branch (detached HEAD): check out the branch to test, or pass --default to test $BRANCH itself"; verdict; }
+  [ "$CUR" != "$BRANCH" ] || { MODE=default; echo "note      on $BRANCH itself, so testing origin/$BRANCH as it is"; }
+fi
+if [ "$MODE" = default ]; then
+  TARGET="$BRANCH"; SHA="$DEFAULT_SHA"; TREE="origin/$BRANCH"
+  echo "branch    $BRANCH  origin/$BRANCH@${SHA:0:7}  (fetched; the working tree is untouched)"
+else
+  TARGET="$CUR"
+  if [ "$LATEST" = 1 ]; then
+    FETCH_ERR="$(git fetch --quiet origin "$CUR" 2>&1)" || { reason "git fetch origin $CUR failed (is it pushed?): $FETCH_ERR"; verdict; }
+    SHA="$(git rev-parse "origin/$CUR")"
+    git merge-base --is-ancestor "$DEFAULT_SHA" "$SHA" || { reason "origin/$CUR@${SHA:0:7} does not contain origin/$BRANCH@${DEFAULT_SHA:0:7}; run without --latest to merge it in and test"; WHERE="$CUR@${SHA:0:7}"; verdict; }
+    echo "branch    $CUR  origin/$CUR@${SHA:0:7}  (contains origin/$BRANCH@${DEFAULT_SHA:0:7}; nothing merged or pushed)"
+  else
+    if ! git diff --quiet HEAD -- 2>/dev/null; then
+      reason "$CUR has uncommitted changes to tracked files; commit or stash them first, since greenlight merges $BRANCH into $CUR"; verdict
+    fi
+    [ ! -e "$(git rev-parse --git-path MERGE_HEAD)" ] || { reason "a merge is already in progress on $CUR; finish or abort it first"; verdict; }
+    if git merge-base --is-ancestor "$DEFAULT_SHA" HEAD; then
+      echo "merge     $CUR already contains origin/$BRANCH@${DEFAULT_SHA:0:7}"
+    elif MERGE_OUT="$(git merge --no-edit "origin/$BRANCH" 2>&1)"; then
+      echo "merge     merged origin/$BRANCH@${DEFAULT_SHA:0:7} into $CUR"
+    else
+      CONFLICTS="$(git diff --name-only --diff-filter=U 2>/dev/null | paste -sd, - | sed 's/,/, /g')"
+      git merge --abort >/dev/null 2>&1
+      if [ -n "$CONFLICTS" ]; then reason "merging origin/$BRANCH into $CUR conflicts in $CONFLICTS; the merge was aborted, resolve it by hand and run again"
+      else reason "merging origin/$BRANCH into $CUR failed: $(printf '%s' "$MERGE_OUT" | tail -1)"; fi
+      WHERE="$CUR"; verdict
+    fi
+    SHA="$(git rev-parse HEAD)"
+    PUSH_ERR="$(git push --quiet -u origin "$CUR" 2>&1)" || { reason "git push origin $CUR failed (the merge is kept locally): $(printf '%s' "$PUSH_ERR" | tail -1)"; WHERE="$CUR@${SHA:0:7}"; verdict; }
+    echo "branch    $CUR@${SHA:0:7}  (pushed; contains origin/$BRANCH@${DEFAULT_SHA:0:7})"
+  fi
+  TREE="$SHA"
+fi
+SHORT="${SHA:0:7}"
+WHERE="$TARGET@$SHORT"
 
 # Does a workflow run as CI: on pull_request, or on push to branches (push to tags only, as a
 # release workflow does, is not CI). Reads the on: block; prints 1 or 0.
@@ -96,14 +143,14 @@ WF_FILES=(); WF_NAMES=(); WF_DISPATCH=(); WF_CI=()
 while IFS= read -r path; do
   [ -n "$path" ] || continue
   case "$path" in *.yml|*.yaml) ;; *) continue ;; esac
-  body="$(git show "origin/$BRANCH:$path" 2>/dev/null)" || continue
+  body="$(git show "$TREE:$path" 2>/dev/null)" || continue
   WF_FILES+=("$(basename "$path")")
   WF_NAMES+=("$(printf '%s\n' "$body" | sed -n 's/^name:[[:space:]]*//p' | head -1 | sed 's/^["'"'"']//; s/["'"'"'][[:space:]]*$//')")
   if printf '%s\n' "$body" | grep -Eq 'workflow_dispatch'; then WF_DISPATCH+=(1); else WF_DISPATCH+=(0); fi
   WF_CI+=("$(printf '%s\n' "$body" | ci_trigger)")
-done < <(git ls-tree --name-only "origin/$BRANCH" .github/workflows/ 2>/dev/null)
+done < <(git ls-tree --name-only "$TREE" .github/workflows/ 2>/dev/null)
 
-[ ${#WF_FILES[@]} -gt 0 ] || { reason "no workflows under .github/workflows on origin/$BRANCH"; verdict; }
+[ ${#WF_FILES[@]} -gt 0 ] || { reason "no workflows under .github/workflows on $WHERE"; verdict; }
 
 # which to run / verify
 SELECTED=()   # indexes into WF_*
@@ -115,7 +162,7 @@ if [ ${#WANT[@]} -gt 0 ]; then
       f="${WF_FILES[$i]}"; stem="${f%.*}"
       if [[ "$w" == "$f" || "$w" == "$stem" || ( -n "${WF_NAMES[$i]}" && "$w" == "${WF_NAMES[$i]}" ) ]]; then hit="$i"; break; fi
     done
-    [ -n "$hit" ] || { reason "no workflow named \"$w\" on origin/$BRANCH (have: ${WF_FILES[*]})"; continue; }
+    [ -n "$hit" ] || { reason "no workflow named \"$w\" on $WHERE (have: ${WF_FILES[*]})"; continue; }
     SELECTED+=("$hit")
   done
   shopt -u nocasematch
@@ -141,8 +188,8 @@ done
 echo "${line%, }"
 
 if [ ${#SELECTED[@]} -eq 0 ]; then
-  if [ "$LATEST" = 1 ]; then reason "no workflow on origin/$BRANCH runs on push or pull_request"
-  else reason "no CI workflow on origin/$BRANCH has a workflow_dispatch trigger; add \`workflow_dispatch:\` under \`on:\` in the one that runs the tests, or use --latest to verify the newest run instead"; fi
+  if [ "$LATEST" = 1 ]; then reason "no workflow on $WHERE runs on push or pull_request"
+  else reason "no CI workflow on $WHERE has a workflow_dispatch trigger; add \`workflow_dispatch:\` under \`on:\` in the one that runs the tests, or use --latest to verify the newest run instead"; fi
   verdict
 fi
 
@@ -164,33 +211,33 @@ echo "== runs"
 for i in "${SELECTED[@]}"; do
   f="${WF_FILES[$i]}"
   if [ "$LATEST" = 1 ]; then
-    id="$(gh run list --workflow "$f" --branch "$BRANCH" --json databaseId,headSha,status,conclusion,createdAt --limit 30 2>/dev/null \
+    id="$(gh run list --workflow "$f" --branch "$TARGET" --json databaseId,headSha,status,conclusion,createdAt --limit 30 2>/dev/null \
       | jq -r --arg sha "$SHA" '[.[] | select(.headSha==$sha and .status=="completed")] | sort_by(.createdAt) | last | .databaseId // empty')"
     if [ -z "$id" ]; then
       named=0; for w in "${WANT[@]:-}"; do [ -n "$w" ] && named=1; done
-      if [ "$named" = 1 ]; then reason "$f: no completed run on origin/$BRANCH@$SHORT (drop --latest to dispatch one)"; fi
+      if [ "$named" = 1 ]; then reason "$f: no completed run on $WHERE (drop --latest to dispatch one)"; fi
       echo "$f: no completed run on $SHORT$([ "$named" = 1 ] || echo ' (its triggers did not fire for this commit; name it to require one)')"
       continue
     fi
     echo "$f: verifying run $id (newest completed on $SHORT)"
   else
-    before="$(gh run list --workflow "$f" --branch "$BRANCH" --event workflow_dispatch --json databaseId --limit 20 2>/dev/null | jq -c '[.[].databaseId]')"
+    before="$(gh run list --workflow "$f" --branch "$TARGET" --event workflow_dispatch --json databaseId --limit 20 2>/dev/null | jq -c '[.[].databaseId]')"
     [ -n "$before" ] || before="[]"
-    err="$(gh workflow run "$f" --ref "$BRANCH" 2>&1 >/dev/null)" || { reason "$f: could not dispatch: $err"; echo "$f: dispatch refused"; continue; }
+    err="$(gh workflow run "$f" --ref "$TARGET" 2>&1 >/dev/null)" || { reason "$f: could not dispatch: $err"; echo "$f: dispatch refused"; continue; }
     id=""
     for ((t=0; t<APPEAR_TRIES; t++)); do
-      id="$(gh run list --workflow "$f" --branch "$BRANCH" --event workflow_dispatch --json databaseId,createdAt --limit 20 2>/dev/null \
+      id="$(gh run list --workflow "$f" --branch "$TARGET" --event workflow_dispatch --json databaseId,createdAt --limit 20 2>/dev/null \
         | jq -r --argjson before "$before" '[.[] | select(.databaseId as $i | $before | index($i) | not)] | sort_by(.createdAt) | last | .databaseId // empty')"
       [ -n "$id" ] && break
       sleep "$POLL"
     done
     if [ -z "$id" ]; then reason "$f: dispatch was accepted but the run never started (waited $((APPEAR_TRIES*POLL))s)"; echo "$f: dispatched, never started"; continue; fi
-    echo "$f: dispatched on $BRANCH, run $id started"
+    echo "$f: dispatched on $TARGET, run $id started"
   fi
   RUN_IDS+=("$id"); RUN_WF+=("$f")
 done
 if [ ${#RUN_IDS[@]} -eq 0 ]; then
-  [ ${#REASONS[@]} -gt 0 ] || reason "no completed run of any CI workflow on origin/$BRANCH@$SHORT (drop --latest to dispatch)"
+  [ ${#REASONS[@]} -gt 0 ] || reason "no completed run of any CI workflow on $WHERE (drop --latest to dispatch)"
   verdict
 fi
 
@@ -244,7 +291,7 @@ for i in "${!RUN_IDS[@]}"; do
   RUN_URLS="${RUN_URLS:+$RUN_URLS }$url"
   echo "run $id $f  $url"
   [ "$rstatus" = completed ] || reason "run $id ($f) is $rstatus, not completed, in the final snapshot"
-  [ "$rsha" = "$SHA" ] || reason "run $id ($f) ran ${rsha:0:7}, not the fetched origin/$BRANCH@$SHORT"
+  [ "$rsha" = "$SHA" ] || reason "run $id ($f) ran ${rsha:0:7}, not the tested $WHERE"
   [ "$rconc" = success ] || reason "run $id ($f) concluded ${rconc:-nothing}, not success"
   jobs="$(printf '%s' "$snap" | jq -c --arg run "$id" --arg wf "$f" '[.jobs[]? | {run:$run, wf:$wf, name, conclusion:(.conclusion // ""), id:(.databaseId|tostring), steps:(.steps // []),
       secs:(if .startedAt and .completedAt then ((.completedAt|fromdateiso8601) - (.startedAt|fromdateiso8601)) else null end)}]')"

@@ -1,5 +1,27 @@
 # aj-log
 
+## 2026-10-14 — greenlight merges the default branch into the current branch and tests that
+
+- `plugins/greenlight/scripts/greenlight.sh`: on any branch other than the default one it now
+  fetches the default branch (still asked of GitHub, never assumed to be `main`), merges it into
+  the current branch, pushes with `-u`, and dispatches CI on the current branch; the verdict's sha
+  check is against the pushed merge and the verdict line reads `<branch>@<sha>`. It refuses on
+  uncommitted changes to tracked files or a merge already in progress, aborts a conflicting merge
+  and names the files, and keeps the merge locally when the push is refused. `--default`, or
+  running on the default branch, keeps the old behaviour (test origin's default branch, touch
+  nothing). `--latest` in branch mode merges and pushes nothing and fails when the pushed branch
+  does not contain the default branch. Required status checks are still read from the default
+  branch's protection, since those are what the merge must pass.
+  Why: asked that greenlight pull the default branch into the current branch and test that,
+  instead of testing the default branch.
+- `greenlight.test.sh`: the 21 existing cases run with `--default`; 8 new cases cover the merge
+  and pass, a run on the unmerged commit, a conflict (aborted, nothing pushed or dispatched),
+  uncommitted changes, a detached HEAD, running on the default branch, a refused push, and
+  `--latest` without the default branch. The fake `gh` resolves `HEAD_OF_CWD` in a run's sha to
+  the merged commit. 29 pass.
+- SKILL.md, the plugin README, the repo README, install.manifest, plugin.json and
+  marketplace.json describe the new flow; version 0.2.0. Reinstalled globally.
+
 ## 2026-10-14 — work-band re-asks for the topic on every prompt
 
 - `plugins/work-band/hooks/register.tsx`: a `prompt.submit` hook attaches one hidden context

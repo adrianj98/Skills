@@ -53,10 +53,11 @@ case "$1 $2" in
     while [ $# -gt 0 ]; do case "$1" in --job) job="$2"; shift ;; --log) log=1 ;; esac; shift; done
     if [ "$log" = 1 ]; then cat "$F/logs/$job.txt" 2>/dev/null; exit 0; fi
     n=0; [ -f "$S/views-$id" ] && n="$(cat "$S/views-$id")"; echo $((n+1)) > "$S/views-$id"
+    head="$(git rev-parse HEAD 2>/dev/null)"
     if [ -f "$F/slow" ] && [ "$n" = 0 ]; then
-      jq -c '. + {status: "in_progress", conclusion: ""}' "$F/runs/$id.json"
+      jq -c '. + {status: "in_progress", conclusion: ""}' "$F/runs/$id.json" | sed "s/HEAD_OF_CWD/$head/g"
     else
-      jq -c . "$F/runs/$id.json"
+      jq -c . "$F/runs/$id.json" | sed "s/HEAD_OF_CWD/$head/g"
     fi ;;
   "api repos/o/r/check-runs/"*"/annotations") j="${2#repos/o/r/check-runs/}"; j="${j%/annotations}"; [ -f "$F/annotations/$j.json" ] && cat "$F/annotations/$j.json" || echo '[]' ;;
   "api repos/o/r/rules/branches/main") [ -f "$F/rules.json" ] && cat "$F/rules.json" || echo '[]' ;;
@@ -84,11 +85,13 @@ make_repo() { # $1 = case dir; writes workflows from $2 (a dir) into the origin'
 }
 SHA_OF() { git -C "$1/seed" rev-parse HEAD; }
 
+MODE_ARGS=(--default)   # the cases up to "branch mode" below test the default branch itself
+export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@t GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@t
 run_case() { # name, fixtures dir, expected exit, expected verdict regex, [args...]
   local name="$1" fx="$2" want_exit="$3" want="$4"; shift 4
   local out code
   rm -rf "$fx/state"
-  out="$(cd "$fx/work" && PATH="$TMP/bin:$PATH" FAKE_GH="$fx" GREENLIGHT_POLL=0 bash "$SCRIPT" "$@" 2>&1)"; code=$?
+  out="$(cd "$fx/work" && PATH="$TMP/bin:$PATH" FAKE_GH="$fx" GREENLIGHT_POLL=0 bash "$SCRIPT" ${MODE_ARGS[@]+"${MODE_ARGS[@]}"} "$@" 2>&1)"; code=$?
   [ "$VERBOSE" = "-v" ] && { echo "----- $name"; echo "$out"; echo "----- exit $code"; }
   local verdict; verdict="$(echo "$out" | sed -n '/^== verdict/,$p' | tail -n +2)"
   if [ "$code" = "$want_exit" ] && echo "$verdict" | grep -Eq "$want"; then
@@ -245,7 +248,7 @@ d="$(fixture ruleset)"; sha="$(make_repo "$d" "$WF")"
 run_json "$sha" success "$JOBS_GOOD" > "$d/runs/100.json"; printf '%s\n' "$LOG_GOOD" > "$d/logs/3.txt"
 echo '[{"type":"required_status_checks","parameters":{"required_status_checks":[{"context":"unit tests"},{"context":"integration tests"}]}}]' > "$d/rules.json"
 run_case "ruleset checks present" "$d" 0 '^GREENLIGHT PASS'
-grep -q 'required  unit tests, integration tests' <(cd "$d/work" && PATH="$TMP/bin:$PATH" FAKE_GH="$d" GREENLIGHT_POLL=0 bash "$SCRIPT" 2>&1) || { echo "FAIL ruleset: required checks not listed"; FAIL=$((FAIL+1)); }
+grep -q 'required  unit tests, integration tests' <(cd "$d/work" && PATH="$TMP/bin:$PATH" FAKE_GH="$d" GREENLIGHT_POLL=0 bash "$SCRIPT" --default 2>&1) || { echo "FAIL ruleset: required checks not listed"; FAIL=$((FAIL+1)); }
 
 # 16. a required check that ran but failed names both reasons
 d="$(fixture requiredfail)"; sha="$(make_repo "$d" "$WF")"
@@ -270,6 +273,68 @@ d="$(fixture norunner)"; sha="$(make_repo "$d" "$WF")"
 run_json "$sha" failure "$(echo "$JOBS_GOOD" | jq '.[2].conclusion="failure" | .[2].steps=[]')" > "$d/runs/100.json"; printf '%s\n' "$LOG_GOOD" > "$d/logs/3.txt"
 mkdir -p "$d/annotations"; echo '[{"annotation_level":"failure","message":"The job was not started because recent account payments have failed or your spending limit needs to be increased."}]' > "$d/annotations/3.json"
 run_case "job never reached a runner" "$d" 1 'job "integration tests".*never started on a runner.*GitHub says: "The job was not started because recent account payments'
+
+# ---------- branch mode: merge the default branch into the current one, push, test that ----------
+MODE_ARGS=()
+commit_in() { # dir, file, content, [message]
+  echo "$3" > "$1/$2"; git -C "$1" add "$2"; git -C "$1" commit --quiet -m "${4:-$2}"
+}
+# The default branch moves on after the feature branch was cut; the feature branch has its own commit.
+branch_fixture() { # name → dir with a work clone on feature, behind origin/main by one commit
+  local d; d="$(fixture "$1")"; make_repo "$d" "$WF" >/dev/null
+  commit_in "$d/work" feature.txt feature
+  commit_in "$d/seed" main.txt main; git -C "$d/seed" push --quiet "$d/origin.git" main
+  run_json HEAD_OF_CWD success "$JOBS_GOOD" > "$d/runs/100.json"; printf '%s\n' "$LOG_GOOD" > "$d/logs/3.txt"
+  echo "$d"
+}
+
+# 20. the default branch is merged in, pushed, and CI runs on the current branch
+d="$(branch_fixture bpass)"
+run_case "branch: merges the default branch and passes" "$d" 0 "^GREENLIGHT PASS  feature@[0-9a-f]{7}  https://github.com/o/r/actions/runs/100$"
+git -C "$d/work" merge-base --is-ancestor "$(git -C "$d/seed" rev-parse HEAD)" HEAD || { echo "FAIL bpass: main was not merged into feature"; FAIL=$((FAIL+1)); }
+[ "$(git -C "$d/origin.git" rev-parse feature 2>/dev/null)" = "$(git -C "$d/work" rev-parse HEAD)" ] || { echo "FAIL bpass: the merged branch was not pushed"; FAIL=$((FAIL+1)); }
+grep -q "^gh workflow run ci.yml --ref feature" "$d/state/calls" || { echo "FAIL bpass: did not dispatch ci.yml on feature"; FAIL=$((FAIL+1)); }
+[ -f "$d/work/dirty.txt" ] || { echo "FAIL bpass: removed an untracked file"; FAIL=$((FAIL+1)); }
+
+# 21. the run must be on the merged commit, not on the branch as it was
+d="$(branch_fixture bstale)"; old="$(git -C "$d/work" rev-parse HEAD)"
+run_json "$old" success "$JOBS_GOOD" > "$d/runs/100.json"
+run_case "branch: a run on the unmerged commit fails" "$d" 1 "${old:0:7}.*not"
+
+# 22. a conflicting merge is aborted and nothing is pushed
+d="$(branch_fixture bconflict)"
+commit_in "$d/work" main.txt "feature's version"
+before="$(git -C "$d/work" rev-parse HEAD)"
+run_case "branch: merge conflict" "$d" 1 "conflicts in main.txt"
+[ "$(git -C "$d/work" rev-parse HEAD)" = "$before" ] && [ ! -e "$d/work/.git/MERGE_HEAD" ] || { echo "FAIL bconflict: the merge was not aborted"; FAIL=$((FAIL+1)); }
+git -C "$d/origin.git" rev-parse --verify --quiet feature >/dev/null && { echo "FAIL bconflict: pushed after a conflict"; FAIL=$((FAIL+1)); }
+grep -q "^gh workflow run" "$d/state/calls" 2>/dev/null && { echo "FAIL bconflict: dispatched after a conflict"; FAIL=$((FAIL+1)); }
+
+# 23. uncommitted changes to tracked files stop it before merging
+d="$(branch_fixture bdirty)"; echo changed > "$d/work/feature.txt"
+run_case "branch: uncommitted changes" "$d" 1 "uncommitted changes"
+[ "$(cat "$d/work/feature.txt")" = changed ] || { echo "FAIL bdirty: lost the uncommitted change"; FAIL=$((FAIL+1)); }
+
+# 24. a detached HEAD has no branch to push
+d="$(branch_fixture bdetached)"; git -C "$d/work" checkout --quiet --detach
+run_case "branch: detached HEAD" "$d" 1 "not on a branch"
+
+# 25. on the default branch itself it tests the default branch, as --default does
+d="$(branch_fixture bondefault)"; git -C "$d/work" checkout --quiet main
+sha="$(git -C "$d/seed" rev-parse HEAD)"; run_json "$sha" success "$JOBS_GOOD" > "$d/runs/100.json"
+run_case "branch: on the default branch" "$d" 0 "^GREENLIGHT PASS  main@${sha:0:7}"
+[ "$(git -C "$d/work" rev-parse HEAD)" = "$(git -C "$d/work" rev-parse origin/main 2>/dev/null)" ] && { echo "FAIL bondefault: moved the local default branch"; FAIL=$((FAIL+1)); }
+
+# 26. a push the remote refuses (it has commits the branch lacks) fails, keeping the merge local
+d="$(branch_fixture brejected)"
+git -C "$d/seed" checkout --quiet -b feature; commit_in "$d/seed" other.txt other; git -C "$d/seed" push --quiet "$d/origin.git" feature
+run_case "branch: push rejected" "$d" 1 "git push.*failed"
+
+# 27. --latest merges nothing and fails when the pushed branch lacks the default branch
+d="$(branch_fixture blatest)"; git -C "$d/work" push --quiet origin feature
+: > "$d/dispatch"
+run_case "branch: --latest without the default branch" "$d" 1 "does not contain origin/main" --latest
+git -C "$d/work" merge-base --is-ancestor "$(git -C "$d/seed" rev-parse HEAD)" HEAD && { echo "FAIL blatest: merged with --latest"; FAIL=$((FAIL+1)); }
 
 echo
 echo "$PASS passed, $FAIL failed"
