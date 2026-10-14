@@ -1095,11 +1095,11 @@ test('every prompt carries a hidden line with the topic the band shows, so the m
     `The work band shows: port picking · tests. If this prompt moves the work to something else, call ${TOPIC_TOOL} before anything else; if it is the same work, leave it.`,
   )
 
-  await $.prompt.submit({ text: 'fix the port bug' })
+  await $.prompt.submit({ text: 'fix the port bug' } as never)
   expect(seen).toEqual([[topicNudge([])]])
 
   await $.tool.call({ tool: TOPIC_TOOL, topics: ['port picking'] } as never)
-  await $.prompt.submit({ text: 'now the tests' })
+  await $.prompt.submit({ text: 'now the tests' } as never)
   expect(seen[1]).toEqual([topicNudge(['port picking'])])
 
   // a prompt the engine marks meta (a notice, not the person) is left alone
