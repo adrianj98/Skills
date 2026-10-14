@@ -14,7 +14,10 @@ branch and pushes, so CI tests your branch as it would be after merging; it refu
 tracked files have uncommitted changes. A merge that conflicts is left in progress and the
 script exits 3 with a `MERGE CONFLICT` block naming the files: the skill has Claude resolve
 them (keeping both sides' intent, asking you when a conflict needs a decision), commit, and
-run it again, which refuses committed conflict markers before pushing. On the default
+run it again, which refuses committed conflict markers before pushing. When the branch has
+an open pull request, the push makes GitHub run the PR's checks, and greenlight judges only
+those runs (the workflows that run on `pull_request`), dispatching nothing; without one it
+dispatches the CI workflows itself. On the default
 branch itself, or with `--default`, it tests the default branch as it is and touches
 nothing. Then it dispatches every CI workflow on that branch — one that runs on
 `pull_request` or on `push` to branches and has a `workflow_dispatch` trigger — waits for
@@ -35,7 +38,7 @@ complete", never as passed.
 
 | | |
 |---|---|
-| `/greenlight` | merge the default branch into this branch, push, dispatch every CI workflow on it, wait, judge |
+| `/greenlight` | merge the default branch into this branch, push, judge the PR's checks (or, with no open PR, dispatch every CI workflow), wait, judge |
 | `/greenlight --default` | test the default branch itself; fetch only, never merge |
 | `/greenlight ci` | only that workflow (file name or `name:`); the only way a manual-only workflow runs |
 | `/greenlight --latest` | merge, push and dispatch nothing; judge the newest completed run of each CI workflow on the pushed sha, which must already contain the default branch |

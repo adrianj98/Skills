@@ -1,5 +1,18 @@
 # aj-log
 
+## 2026-10-14 — greenlight judges the pull request's own checks
+
+- `plugins/greenlight/scripts/greenlight.sh`: in branch mode, when the branch has an open pull
+  request (`gh pr view`), greenlight dispatches nothing. The push of the merge makes GitHub run
+  the PR's checks, so it waits for the `pull_request` run of each workflow that triggers on
+  `pull_request` on the pushed sha and judges those. A workflow whose filters skip the PR is
+  listed, not failed; the default branch's required checks still have to be present and green.
+  No run at all is a FAIL. A closed or merged PR, or none, falls back to dispatching. Named
+  workflows still dispatch. Why: asked that it only run the tests the PR asks for.
+- `greenlight.test.sh`: the fake `gh` answers `pr view` from `pr.json`; cases for judging an open
+  PR's checks (nothing dispatched, push-only and manual workflows ignored), an open PR with no
+  checks, and a merged PR falling back to dispatch. 36 pass.
+
 ## 2026-10-14 — greenlight leaves a conflicting merge for Claude to resolve
 
 - `plugins/greenlight/scripts/greenlight.sh`: a merge that conflicts is no longer aborted. The

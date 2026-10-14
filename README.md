@@ -129,8 +129,9 @@ claude plugin install caveman@adrianj98-skills
 `/greenlight` — merge the default branch into your branch, push, run CI on it on GitHub
 Actions, integration tests included, and get a verdict the model can only copy. A script
 asks GitHub which branch is the default, merges it into the current branch (refusing on
-uncommitted changes; on a conflict Claude resolves it, commits and runs it again) and pushes, dispatches every CI workflow on
-the branch (never a tag-only or manual-only one unless named), waits, then
+uncommitted changes; on a conflict Claude resolves it, commits and runs it again) and pushes, judges the checks the push runs on the
+branch's open pull request (or, without one, dispatches every CI workflow, never a tag-only or
+manual-only one unless named), waits, then
 judges one final snapshot per run: every job `success`, the right sha, an integration job
 that ran its test steps and reported tests, every required status check present and green.
 `GREENLIGHT PASS` or `GREENLIGHT FAIL` with reasons; the skill reports that line verbatim and

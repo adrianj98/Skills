@@ -5,8 +5,10 @@
 # branch as it is on origin and touches nothing.
 #
 #   greenlight.sh                   fetch the default branch, merge it into the current branch,
-#                                   push, and dispatch every CI workflow (one that runs on push
-#                                   or pull_request and has workflow_dispatch) on that branch
+#                                   push; with an open pull request, judge the checks the push
+#                                   makes GitHub run on it (its pull_request workflows), else
+#                                   dispatch every CI workflow (one that runs on push or
+#                                   pull_request and has workflow_dispatch) on that branch
 #   greenlight.sh --default         test the default branch itself: fetch only, never merge
 #   greenlight.sh ci integration    only those workflows: file name or name:, .yml optional;
 #                                   a manual-only workflow runs only when named like this
@@ -132,6 +134,19 @@ fi
 SHORT="${SHA:0:7}"
 WHERE="$TARGET@$SHORT"
 
+# ---------- an open pull request decides which tests run ----------
+# Pushing the branch makes GitHub run the PR's checks on the pushed commit, so with an open PR
+# greenlight dispatches nothing and judges those runs: the workflows the PR triggers.
+PR_MODE=0
+if [ "$MODE" = branch ] && [ ${#WANT[@]} -eq 0 ]; then
+  PR_JSON="$(gh pr view "$TARGET" --json number,url,baseRefName,state 2>/dev/null)" || PR_JSON=""
+  if [ -n "$PR_JSON" ] && [ "$(printf '%s' "$PR_JSON" | jq -r .state)" = OPEN ]; then
+    PR_MODE=1
+    PR_NUM="$(printf '%s' "$PR_JSON" | jq -r .number)"
+    echo "pr        #$PR_NUM $(printf '%s' "$PR_JSON" | jq -r .url) (base $(printf '%s' "$PR_JSON" | jq -r .baseRefName)): judging the checks it runs, dispatching nothing"
+  fi
+fi
+
 # Does a workflow run as CI: on pull_request, or on push to branches (push to tags only, as a
 # release workflow does, is not CI). Reads the on: block; prints 1 or 0.
 ci_trigger() {
@@ -151,7 +166,15 @@ ci_trigger() {
 }
 
 # ---------- workflows on that sha ----------
-WF_FILES=(); WF_NAMES=(); WF_DISPATCH=(); WF_CI=()
+# Does a workflow run on pull_request: reads the on: block; prints 1 or 0.
+pr_trigger() {
+  awk '/^on:/ { inon=1; if ($0 ~ /pull_request/) pr=1; next }
+       inon && /^[A-Za-z_]/ { inon=0 }
+       inon && /^[ \t]*(-[ \t]*)?pull_request(_target)?([ \t]*:|[ \t]*$)/ { pr=1 }
+       END { print (pr ? 1 : 0) }'
+}
+
+WF_FILES=(); WF_NAMES=(); WF_DISPATCH=(); WF_CI=(); WF_PR=()
 while IFS= read -r path; do
   [ -n "$path" ] || continue
   case "$path" in *.yml|*.yaml) ;; *) continue ;; esac
@@ -160,6 +183,7 @@ while IFS= read -r path; do
   WF_NAMES+=("$(printf '%s\n' "$body" | sed -n 's/^name:[[:space:]]*//p' | head -1 | sed 's/^["'"'"']//; s/["'"'"'][[:space:]]*$//')")
   if printf '%s\n' "$body" | grep -Eq 'workflow_dispatch'; then WF_DISPATCH+=(1); else WF_DISPATCH+=(0); fi
   WF_CI+=("$(printf '%s\n' "$body" | ci_trigger)")
+  WF_PR+=("$(printf '%s\n' "$body" | pr_trigger)")
 done < <(git ls-tree --name-only "$TREE" .github/workflows/ 2>/dev/null)
 
 [ ${#WF_FILES[@]} -gt 0 ] || { reason "no workflows under .github/workflows on $WHERE"; verdict; }
@@ -181,7 +205,8 @@ if [ ${#WANT[@]} -gt 0 ]; then
   [ ${#REASONS[@]} -eq 0 ] || verdict
 else
   for i in "${!WF_FILES[@]}"; do
-    if [ "$LATEST" = 1 ]; then [ "${WF_CI[$i]}" = 1 ] && SELECTED+=("$i")
+    if [ "$PR_MODE" = 1 ]; then [ "${WF_PR[$i]}" = 1 ] && SELECTED+=("$i")
+    elif [ "$LATEST" = 1 ]; then [ "${WF_CI[$i]}" = 1 ] && SELECTED+=("$i")
     else [ "${WF_CI[$i]}" = 1 ] && [ "${WF_DISPATCH[$i]}" = 1 ] && SELECTED+=("$i"); fi
   done
 fi
@@ -189,8 +214,9 @@ fi
 line="workflows "
 for i in "${!WF_FILES[@]}"; do
   f="${WF_FILES[$i]}"; tag="not selected"
-  for s in "${SELECTED[@]:-}"; do [ "$s" = "$i" ] && tag="$([ "$LATEST" = 1 ] && echo verify || echo dispatch)"; done
-  if [ "$tag" = "not selected" ]; then
+  for s in "${SELECTED[@]:-}"; do [ "$s" = "$i" ] && tag="$({ [ "$LATEST" = 1 ] || [ "$PR_MODE" = 1 ]; } && echo verify || echo dispatch)"; done
+  if [ "$tag" = "not selected" ] && [ "$PR_MODE" = 1 ]; then tag="not run by the pull request"
+  elif [ "$tag" = "not selected" ]; then
     if [ "${WF_DISPATCH[$i]}" = 1 ] && [ "${WF_CI[$i]}" = 0 ]; then tag="manual-only, not run unless named"
     elif [ "${WF_DISPATCH[$i]}" = 0 ] && [ "$LATEST" = 0 ]; then tag="no workflow_dispatch trigger"
     fi
@@ -200,7 +226,8 @@ done
 echo "${line%, }"
 
 if [ ${#SELECTED[@]} -eq 0 ]; then
-  if [ "$LATEST" = 1 ]; then reason "no workflow on $WHERE runs on push or pull_request"
+  if [ "$PR_MODE" = 1 ]; then reason "no workflow on $WHERE runs on pull_request, so pull request #$PR_NUM runs no checks"
+  elif [ "$LATEST" = 1 ]; then reason "no workflow on $WHERE runs on push or pull_request"
   else reason "no CI workflow on $WHERE has a workflow_dispatch trigger; add \`workflow_dispatch:\` under \`on:\` in the one that runs the tests, or use --latest to verify the newest run instead"; fi
   verdict
 fi
@@ -220,7 +247,28 @@ else echo "required  no status checks are required on $BRANCH (no branch protect
 RUN_IDS=(); RUN_WF=()
 echo
 echo "== runs"
+if [ "$PR_MODE" = 1 ]; then
+  # Wait for each workflow's pull_request run on the pushed sha; a workflow whose paths or
+  # branches filters skip this PR never gets one, and the required checks below catch any
+  # that had to run.
+  PENDING=("${SELECTED[@]}")
+  for ((t=0; t<APPEAR_TRIES && ${#PENDING[@]} > 0; t++)); do
+    LEFT=()
+    for i in "${PENDING[@]}"; do
+      f="${WF_FILES[$i]}"
+      id="$(gh run list --workflow "$f" --branch "$TARGET" --event pull_request --json databaseId,headSha,status,conclusion,createdAt --limit 20 2>/dev/null \
+        | jq -r --arg sha "$SHA" '[.[] | select(.headSha==$sha)] | sort_by(.createdAt) | last | .databaseId // empty')"
+      if [ -n "$id" ]; then RUN_IDS+=("$id"); RUN_WF+=("$f"); echo "$f: pull request #$PR_NUM run $id on $SHORT"
+      else LEFT+=("$i"); fi
+    done
+    PENDING=(${LEFT[@]+"${LEFT[@]}"})
+    [ ${#PENDING[@]} -eq 0 ] || sleep "$POLL"
+  done
+  for i in ${PENDING[@]+"${PENDING[@]}"}; do echo "${WF_FILES[$i]}: no pull request run on $SHORT (its filters may skip this PR)"; done
+  [ ${#RUN_IDS[@]} -gt 0 ] || { reason "no checks ran on pull request #$PR_NUM for $WHERE (waited $((APPEAR_TRIES*POLL))s)"; verdict; }
+fi
 for i in "${SELECTED[@]}"; do
+  [ "$PR_MODE" = 0 ] || break
   f="${WF_FILES[$i]}"
   if [ "$LATEST" = 1 ]; then
     id="$(gh run list --workflow "$f" --branch "$TARGET" --json databaseId,headSha,status,conclusion,createdAt --limit 30 2>/dev/null \

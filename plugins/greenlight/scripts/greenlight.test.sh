@@ -33,6 +33,7 @@ echo "gh $*" >> "$S/calls"
 case "$1 $2" in
   "auth status") exit 0 ;;
   "repo view") cat "$F/repo.json" ;;
+  "pr view") [ -f "$F/pr.json" ] && cat "$F/pr.json" || { echo "no pull requests found for branch" >&2; exit 1; } ;;
   "workflow run")
     wf="$3"
     id="$(awk -v w="$wf" '$1==w{print $2}' "$F/dispatch" 2>/dev/null)"
@@ -47,7 +48,8 @@ case "$1 $2" in
     if [ -f "$S/dispatched" ]; then
       extra="$(awk -v w="$wf" '$1==w{print $2}' "$S/dispatched" | jq -R 'tonumber' | jq -s --arg w "$wf" --slurpfile all <(for f in "$F"/runs/*.json; do jq --arg id "$(basename "$f" .json)" --arg w "$wf" '. + {databaseId: ($id|tonumber), workflow: $w}' "$f" 2>/dev/null; done | jq -s .) '[.[] as $id | $all[0][] | select(.databaseId==$id)] | map({databaseId, headSha, status, conclusion, createdAt})')"
     fi
-    jq -c --arg w "$wf" --argjson extra "$extra" '[.[] | select($w=="" or .workflow==$w) | {databaseId, headSha, status, conclusion, createdAt}] + $extra' "$F/before.json" ;;
+    jq -c --arg w "$wf" --argjson extra "$extra" '[.[] | select($w=="" or .workflow==$w) | {databaseId, headSha, status, conclusion, createdAt}] + $extra' "$F/before.json" \
+      | sed "s/HEAD_OF_CWD/$(git rev-parse HEAD 2>/dev/null)/g" ;;
   "run view")
     id="$3"; job=""; log=0; shift 3
     while [ $# -gt 0 ]; do case "$1" in --job) job="$2"; shift ;; --log) log=1 ;; esac; shift; done
@@ -348,6 +350,25 @@ d="$(branch_fixture blatest)"; git -C "$d/work" push --quiet origin feature
 : > "$d/dispatch"
 run_case "branch: --latest without the default branch" "$d" 1 "does not contain origin/main" --latest
 git -C "$d/work" merge-base --is-ancestor "$(git -C "$d/seed" rev-parse HEAD)" HEAD && { echo "FAIL blatest: merged with --latest"; FAIL=$((FAIL+1)); }
+
+# 28. with an open pull request it judges the checks GitHub runs on the PR and dispatches nothing
+d="$(branch_fixture bpr)"; : > "$d/dispatch"
+echo '{"number":7,"url":"https://github.com/o/r/pull/7","baseRefName":"main","state":"OPEN"}' > "$d/pr.json"
+echo '[{"databaseId":100,"workflow":"ci.yml","headSha":"HEAD_OF_CWD","status":"completed","conclusion":"success","createdAt":"2026-10-14T10:00:00Z"}]' > "$d/before.json"
+run_case "branch with PR: judges the PR's checks" "$d" 0 "^GREENLIGHT PASS  feature@[0-9a-f]{7}  https://github.com/o/r/actions/runs/100$"
+grep -q "^gh workflow run" "$d/state/calls" && { echo "FAIL bpr: dispatched with a PR open"; FAIL=$((FAIL+1)); }
+grep -q -- "--workflow release.yml\|--workflow docs.yml\|--workflow tagrelease.yml" "$d/state/calls" && { echo "FAIL bpr: looked at a workflow the PR does not run"; FAIL=$((FAIL+1)); }
+
+# 29. an open PR whose checks never start on the pushed commit fails
+d="$(branch_fixture bprnone)"; : > "$d/dispatch"
+echo '{"number":7,"url":"https://github.com/o/r/pull/7","baseRefName":"main","state":"OPEN"}' > "$d/pr.json"
+run_case "branch with PR: no checks ran" "$d" 1 "no checks ran on pull request #7"
+
+# 30. a closed PR does not count; it dispatches as without one
+d="$(branch_fixture bprclosed)"
+echo '{"number":7,"url":"https://github.com/o/r/pull/7","baseRefName":"main","state":"MERGED"}' > "$d/pr.json"
+run_case "branch with a merged PR: dispatches" "$d" 0 "^GREENLIGHT PASS  feature@"
+grep -q "^gh workflow run ci.yml --ref feature" "$d/state/calls" || { echo "FAIL bprclosed: did not dispatch"; FAIL=$((FAIL+1)); }
 
 echo
 echo "$PASS passed, $FAIL failed"

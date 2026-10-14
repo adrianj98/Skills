@@ -16,8 +16,10 @@ directories above this skill's base directory: run `scripts/greenlight.sh` from 
 
 The script asks GitHub which branch is the default (it never assumes `main`) and fetches it.
 On any other branch it merges the default branch into the current branch, pushes the
-result, and dispatches every CI workflow on the current branch, so CI tests the branch as
-it would be after merging. It refuses when tracked files have uncommitted changes. A merge
+result. When the branch has an open pull request, the push makes GitHub run the PR's checks,
+and the script judges exactly those: the workflows that run on `pull_request`, nothing
+dispatched. Without an open PR it dispatches every CI workflow on the branch. Either way CI
+tests the branch as it would be after merging. It refuses when tracked files have uncommitted changes. A merge
 that conflicts is left in progress for you to resolve (below). On the default branch itself, or with `--default`, it tests
 the default branch as it is on origin and touches nothing. It waits for the runs, takes one
 final `gh run view` snapshot per run, judges only that, and exits 0 only when its last block
