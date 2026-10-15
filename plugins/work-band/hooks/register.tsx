@@ -735,9 +735,9 @@ async function refreshAll($: EngineInterface) {
 }
 
 // Until the server answers on its port, `server` flashes blue; once it
-// answers it turns green and the port is not checked again. The port is
-// checked only after kill-port has finished, so a server it is about to
-// kill does not count.
+// answers it turns green and the port is not checked again. The first check
+// is a couple of seconds in, after kill-port has cleared the port; the band
+// cannot wait on kill-port's own state, which turbo leaves running.
 const BLINK_MS = 500
 const BLINKS_PER_CHECK = 4
 let upTimer: { cancel(): void } | null = null
@@ -754,8 +754,7 @@ function watchUp($: EngineInterface, mine: number) {
         return
       }
       await update($, serve, (s): Serve => ({ ...s, blink: !s.blink }))
-      if (ticks++ % BLINKS_PER_CHECK) return
-      if (tasksOf(s).some(t => t.name === 'kill-port' && (t.state === 'pending' || t.state === 'running'))) return
+      if (++ticks % BLINKS_PER_CHECK) return
       const r = await $.process.run(['curl', '-s', '-o', '/dev/null', '-m', '2', serverUrl(await read($, port))])
       if (r.exitCode !== 0 || mine !== generation) return
       timer.cancel()
@@ -766,6 +765,30 @@ function watchUp($: EngineInterface, mine: number) {
   upTimer = timer
 }
 
+// The pids of every `turbo run serve` this Claude process started, and of
+// everything under them. `ps` rows are `pid ppid command`.
+export const serveTrees = (ps: string, me: number): number[] => {
+  const rows = ps
+    .split('\n')
+    .map(l => /^\s*(\d+)\s+(\d+)\s+(.*)$/.exec(l))
+    .filter((m): m is RegExpExecArray => m !== null)
+    .map(m => ({ pid: Number(m[1]), ppid: Number(m[2]), command: m[3]! }))
+  const out = rows.filter(r => r.ppid === me && r.command.includes('turbo run serve')).map(r => r.pid)
+  for (let i = 0; i < out.length; i++) for (const r of rows) if (r.ppid === out[i] && !out.includes(r.pid)) out.push(r.pid)
+  return out
+}
+
+// Leaving the stream kills only npm, not the turbo, yarn, server and vite
+// under it, and a hot reload of this module loses `child` altogether, so a
+// restart would start a second server beside the first. Every server tree
+// this Claude process started is found with `ps` and killed instead.
+async function killServers($: EngineInterface) {
+  const me = Number((await $.process.run(['sh', '-c', 'echo $PPID'])).stdout.trim())
+  if (!me) return
+  const pids = serveTrees((await $.process.run(['ps', '-axo', 'pid=,ppid=,command='])).stdout, me)
+  if (pids.length) await $.process.run(['kill', '-TERM', ...pids.map(String)])
+}
+
 async function stopServe($: EngineInterface) {
   ++generation
   if (child) {
@@ -773,6 +796,7 @@ async function stopServe($: EngineInterface) {
     child = null
     await old.return(undefined) // leaving the stream kills the child
   }
+  await killServers($).catch(() => {})
   await update($, serve, (s): Serve => ({ state: 'stopped', tasks: finishTasks(tasksOf(s), null) }))
 }
 
@@ -896,6 +920,7 @@ async function restartServe($: EngineInterface) {
     child = null
     await old.return(undefined) // leaving the stream kills the child
   }
+  await killServers($).catch(() => {})
   logs.clear()
   // ORCHESTRATOR_SINGLETON_GATE=false: skip the Postgres singleton lock, so
   // this server boots beside another worktree's instead of parking behind it

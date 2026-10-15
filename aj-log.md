@@ -1,5 +1,18 @@
 # aj-log
 
+## 2026-10-15 — work-band: blinking that never stopped; duplicate servers after a reload
+
+- `register.tsx`, the port check never ran. It waited for kill-port to finish, but turbo
+  leaves kill-port marked running, so `server` blinked blue forever and never ran `curl`.
+  The check now runs every 2 s from 2 s after the start, with no kill-port wait.
+- `register.tsx`, the reload fix. Leaving the spawn stream kills only `npm exec`, not the
+  turbo, yarn, orchestrator and `vite build --watch` under it. A hot reload also loses
+  `child`, so pressing `server` started a second server beside the first: two were found in
+  feature-tollforsettings, started by one session. Restart and Kill now find, through
+  `ps`, every `turbo run serve` whose parent is this Claude process (`$PPID` of a `sh`
+  run), and kill it with all its descendants. `serveTrees` is exported, with a test of
+  its own. 88 pass.
+
 ## 2026-10-15 — work-band: `server` flashes blue until the port answers, then green
 
 - `register.tsx`: starting the server begins a 500 ms blink. `server` alternates between blue

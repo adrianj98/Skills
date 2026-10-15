@@ -35,6 +35,7 @@ import {
   taskOfLine,
   toChecks,
   withoutPrefix,
+  serveTrees,
 } from './register'
 
 type Engine = Parameters<Extract<Parameters<typeof test>[1], (...a: never[]) => unknown>>[0]
@@ -1259,4 +1260,23 @@ test('the band ends with the plan alone, not the org', async ($, on) => {
   )
   const band = await mountBand($, 'terminal')
   expect((await band.findAll({ type: 'Box' }))[1]!.text).toMatch(/ {3}Team$/)
+})
+
+test('serveTrees: the servers this Claude started and everything under them, no one else\'s', () => {
+  const ps = [
+    '  100     1 claude',
+    '  200   100 npm exec turbo run serve --ui=stream',
+    '  201   200 node /x/.bin/turbo run serve --ui=stream',
+    '  202   201 /x/turbo run serve --ui=stream',
+    '  203   202 node yarn run serve',
+    '  204   203 node ./src/server/sessions/bin/orchestrator.ts -s',
+    '  205   202 node vite build --watch',
+    '  300   100 git status',
+    '  400     1 claude',
+    '  401   400 npm exec turbo run serve --ui=stream',
+    '  402   401 node /x/.bin/turbo run serve --ui=stream',
+  ].join('\n')
+  expect(serveTrees(ps, 100).sort()).toEqual([200, 201, 202, 203, 204, 205])
+  expect(serveTrees(ps, 400).sort()).toEqual([401, 402])
+  expect(serveTrees(ps, 999)).toEqual([])
 })
