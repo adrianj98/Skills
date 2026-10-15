@@ -187,8 +187,8 @@
       "name": "greenlight",
       "displayName": "Greenlight",
       "source": "./plugins/greenlight",
-      "description": "Merges the default branch into the current branch, pushes, and reruns the pull request's required integration check when it was skipped. A skill only, no script.",
-      "version": "0.3.0",
+      "description": "Merges the default branch into the current branch, pushes, reruns the pull request's required integration check when it was skipped, and fixes the code when a check fails. A skill only, no script.",
+      "version": "0.4.0",
       "author": {
         "name": "Adrian Jones",
         "url": "https://github.com/adrianj98"

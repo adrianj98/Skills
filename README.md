@@ -124,13 +124,13 @@ claude plugin install caveman@adrianj98-skills
 
 [Full README →](plugins/caveman/README.md)
 
-### [`greenlight`](plugins/greenlight) · v0.3.0
+### [`greenlight`](plugins/greenlight) · v0.4.0
 
 `/greenlight`: a skill with no script behind it. It pulls the default branch (asking GitHub
 which one that is), merges it into your branch, and pushes. If the merge conflicts, Claude
 resolves it. If the pull request has a required `integration` check that came out
-`skipping`, Claude reruns that run once. It then reports each check's result from
-`gh pr checks`.
+`skipping`, Claude reruns that run once. When a check fails, Claude fixes the code and
+pushes again, up to three times. It then reports each check's result from `gh pr checks`.
 
 ```bash
 claude plugin install greenlight@adrianj98-skills

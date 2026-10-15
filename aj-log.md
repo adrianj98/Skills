@@ -1,5 +1,15 @@
 # aj-log
 
+## 2026-10-15 — greenlight fixes failing checks
+
+- `SKILL.md`: added a step for failing checks. Claude reads `gh run view --log-failed`, fixes the
+  code (never skipping or loosening the test), commits, pushes and waits again.
+  - A failure in the infrastructure instead of the code is rerun once with `--failed`.
+  - Claude stops after three attempts on the same check.
+- Dropped `allowed-tools: Bash`, because fixing needs edits.
+- Version 0.4.0.
+- Why: the user asked for it to fix tests when they fail.
+
 ## 2026-10-15 — greenlight is a plain skill now, no script
 
 - Deleted `plugins/greenlight/scripts/greenlight.sh` and its tests. `SKILL.md` is five steps:
