@@ -1,10 +1,19 @@
 {
   "name": "greenlight",
   "displayName": "Greenlight",
-  "version": "0.2.0",
-  "description": "Merges the default branch into the current branch, pushes, runs CI on it on GitHub Actions, integration tests included, and prints a PASS/FAIL verdict from one final snapshot of every job, so the model reports what ran rather than what it assumes. --default tests the default branch itself.",
-  "author": { "name": "Adrian Jones", "url": "https://github.com/adrianj98" },
+  "version": "0.3.0",
+  "description": "Merges the default branch into the current branch, pushes, and reruns the pull request's required integration check when it was skipped. A skill only, no script.",
+  "author": {
+    "name": "Adrian Jones",
+    "url": "https://github.com/adrianj98"
+  },
   "repository": "https://github.com/adrianj98/skills",
   "license": "MIT",
-  "keywords": ["ci", "github-actions", "integration-tests", "verification", "default-branch", "workflow_dispatch"]
+  "keywords": [
+    "ci",
+    "github-actions",
+    "integration-tests",
+    "merge",
+    "pull-request"
+  ]
 }

@@ -54,7 +54,7 @@
       "name": "deslop",
       "displayName": "Deslop",
       "source": "./plugins/deslop",
-      "description": "Finds the AI slop in what just changed \u2014 restating comments, defensive checks on trusted values, dead abstraction, inflated prose \u2014 reports it, and on request cuts it.",
+      "description": "Finds the AI slop in what just changed — restating comments, defensive checks on trusted values, dead abstraction, inflated prose — reports it, and on request cuts it.",
       "version": "0.1.0",
       "author": {
         "name": "Adrian Jones",
@@ -76,7 +76,7 @@
       "name": "showmethedata",
       "displayName": "Show Me The Data",
       "source": "./plugins/showmethedata",
-      "description": "Point it at a file, type, table, field or feature and it explains how that data is stored and used \u2014 where it lives, its shape across layers and where the shapes drift, who writes it, who reads it, how it moves, and when it dies.",
+      "description": "Point it at a file, type, table, field or feature and it explains how that data is stored and used — where it lives, its shape across layers and where the shapes drift, who writes it, who reads it, how it moves, and when it dies.",
       "version": "0.1.0",
       "author": {
         "name": "Adrian Jones",
@@ -142,7 +142,7 @@
       "name": "progress",
       "displayName": "Progress",
       "source": "./plugins/progress",
-      "description": "Where a branch and its pull request stand: what it's about, then its state \u2014 review, checks, conflicts, what's unpushed, and the one thing left before it merges.",
+      "description": "Where a branch and its pull request stand: what it's about, then its state — review, checks, conflicts, what's unpushed, and the one thing left before it merges.",
       "version": "0.1.0",
       "author": {
         "name": "Adrian Jones",
@@ -187,8 +187,8 @@
       "name": "greenlight",
       "displayName": "Greenlight",
       "source": "./plugins/greenlight",
-      "description": "Merges the default branch into the current branch, pushes, runs CI on it on GitHub Actions, integration tests included, and prints a PASS/FAIL verdict from one final snapshot of every job, so the model reports what ran rather than what it assumes. --default tests the default branch itself.",
-      "version": "0.2.0",
+      "description": "Merges the default branch into the current branch, pushes, and reruns the pull request's required integration check when it was skipped. A skill only, no script.",
+      "version": "0.3.0",
       "author": {
         "name": "Adrian Jones",
         "url": "https://github.com/adrianj98"
@@ -199,9 +199,8 @@
         "ci",
         "github-actions",
         "integration-tests",
-        "verification",
-        "default-branch",
-        "workflow_dispatch"
+        "merge",
+        "pull-request"
       ],
       "category": "development"
     }

@@ -2,16 +2,8 @@
 # Verbs are documented in ../adversarial-review/install.manifest.
 
 name   Greenlight
-about  Merges the default branch into the current branch, pushes, runs CI on it on GitHub Actions, integration tests included, and prints a PASS/FAIL verdict the model copies rather than infers.
+about  Merges the default branch into the current branch, pushes, and reruns the required integration check when the PR skipped it.
 
 file   skills/greenlight/SKILL.md  skills/greenlight/SKILL.md       /greenlight
-file   scripts/greenlight.sh       skills/greenlight/greenlight.sh  dispatches, waits, snapshots, judges
 
-# Outside the plugin system there is no ${CLAUDE_PLUGIN_ROOT} and no /plugin:skill namespace.
-rewrite  ${CLAUDE_PLUGIN_ROOT}/scripts/greenlight.sh  @ROOT@/skills/greenlight/greenlight.sh
-rewrite  /greenlight:greenlight                       /greenlight
-
-tip  /greenlight                   merge the default branch into this branch, push, run its CI and judge the runs
-tip  /greenlight --default         test the default branch itself, merging nothing
-tip  /greenlight --latest          judge the newest completed runs on the current sha instead
-tip  /greenlight ci --match e2e    one workflow, and what counts as the integration job
+tip  /greenlight   merge the default branch in, push, make sure integration runs

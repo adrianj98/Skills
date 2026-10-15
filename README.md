@@ -124,20 +124,13 @@ claude plugin install caveman@adrianj98-skills
 
 [Full README →](plugins/caveman/README.md)
 
-### [`greenlight`](plugins/greenlight) · v0.2.0
+### [`greenlight`](plugins/greenlight) · v0.3.0
 
-`/greenlight` — merge the default branch into your branch, push, run CI on it on GitHub
-Actions, integration tests included, and get a verdict the model can only copy. A script
-asks GitHub which branch is the default, merges it into the current branch (refusing on
-uncommitted changes; on a conflict Claude resolves it, commits and runs it again) and pushes, judges the checks the push runs on the
-branch's open pull request (or, without one, dispatches every CI workflow, never a tag-only or
-manual-only one unless named), waits, then
-judges one final snapshot per run: every job `success`, the right sha, an integration job
-that ran its test steps and reported tests, every required status check present and green.
-`GREENLIGHT PASS` or `GREENLIGHT FAIL` with reasons; the skill reports that line verbatim and
-output with no verdict as "did not complete". `/greenlight --default` tests the default
-branch itself, as does running it on the default branch. `/greenlight --latest` judges the
-newest runs on the pushed sha instead of starting new ones.
+`/greenlight`: a skill with no script behind it. It pulls the default branch (asking GitHub
+which one that is), merges it into your branch, and pushes. If the merge conflicts, Claude
+resolves it. If the pull request has a required `integration` check that came out
+`skipping`, Claude reruns that run once. It then reports each check's result from
+`gh pr checks`.
 
 ```bash
 claude plugin install greenlight@adrianj98-skills

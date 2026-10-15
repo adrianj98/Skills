@@ -1,85 +1,56 @@
 ---
 name: greenlight
-description: Merge the repository's default branch into the current branch, push it, run CI on it on GitHub Actions, integration tests included, and report whether it passed from a script's verdict rather than a reading of the logs. With --default, or on the default branch itself, it tests the default branch. Use when the user asks to run CI on their branch or on the default branch, to check that the integration tests pass, to prove a branch is green against the latest default branch, or for a greenlight before a release or a merge.
-argument-hint: "[workflow ...] [--default] [--latest] [--match REGEX] [--timeout MIN]"
+description: Merge the repository's default branch into the current branch, push it, and make sure the pull request's required integration check actually runs, rerunning it when it was skipped. Use when the user asks to run CI on their branch, to bring a branch up to date with develop or main and test it, or for a greenlight before a merge.
 allowed-tools: Bash
 ---
 
-Run the script in the background, since a CI run takes minutes, and wait for it to exit:
+1. **Pull the default branch.** Ask GitHub which branch is the default; never assume `main`.
 
-```
-bash "${CLAUDE_PLUGIN_ROOT}/scripts/greenlight.sh" $ARGUMENTS
-```
+   ```bash
+   base=$(gh repo view --json defaultBranchRef -q .defaultBranchRef.name)
+   git fetch origin "$base"
+   ```
 
-If `${CLAUDE_PLUGIN_ROOT}` is not set on this host (Devin, for one), the plugin root is two
-directories above this skill's base directory: run `scripts/greenlight.sh` from there.
+   Stop if tracked files have uncommitted changes, or if you are on the default branch itself.
 
-The script asks GitHub which branch is the default (it never assumes `main`) and fetches it.
-On any other branch it merges the default branch into the current branch, pushes the
-result. When the branch has an open pull request, the push makes GitHub run the PR's checks,
-and the script judges exactly those: the workflows that run on `pull_request`, nothing
-dispatched; a PR check that did not start on the pushed commit is started by dispatching it.
-Without an open PR it dispatches every CI workflow on the branch. A run in which a job was
-cancelled, skipped or never reached a runner is rerun once and the new attempt judged; a
-real failure is never rerun, so a `rerunning it once` line in the output is expected. Either way CI
-tests the branch as it would be after merging. It refuses when tracked files have uncommitted changes. A merge
-that conflicts is left in progress for you to resolve (below). On the default branch itself, or with `--default`, it tests
-the default branch as it is on origin and touches nothing. It waits for the runs, takes one
-final `gh run view` snapshot per run, judges only that, and exits 0 only when its last block
-reads `GREENLIGHT PASS`. `--latest` merges, pushes and dispatches nothing: it verifies the
-newest completed runs on the branch's pushed sha, which must already contain the default
-branch. A workflow name narrows it to that workflow, and is the only way a manual-only
-workflow (a release, say) gets dispatched.
+2. **Merge it in.**
 
-## When the merge conflicts
+   ```bash
+   git merge --no-edit "origin/$base"
+   ```
 
-The script exits 3 and its last block starts `MERGE CONFLICT`, followed by one
-`- conflicted: <file>` line per file. The merge is still in progress. Resolve it, then run
-the script again with the same arguments:
+   If it conflicts, resolve each file yourself, keeping what both sides meant. Then `git add` the
+   files and run `git commit --no-edit`. If a conflict needs a decision only the user can make,
+   stop and ask. Never abort, reset or force-push.
 
-1. For each conflicted file, read both sides and what each side changed:
-   `git diff <file>` for the conflict, and `git log --oneline -5 MERGE_HEAD -- <file>` and
-   `git log --oneline -5 HEAD -- <file>` for why. Keep both sides' intent: the default
-   branch's change and the branch's change usually both have to survive, combined. Never
-   resolve by taking one side wholesale unless the other side's change is clearly superseded.
-2. Remove every conflict marker. Check with `git diff --check`.
-3. When it builds or has fast checks (a type check, a compile, the unit tests near the
-   conflict), run them locally before committing.
-4. `git add` the resolved files and `git commit --no-edit`.
-5. Run the script again. It sees the branch already contains the default branch, refuses
-   committed conflict markers, pushes, and runs CI.
+3. **Push.**
 
-Stop and ask the user, leaving the merge in progress, when a conflict needs a product or
-design decision rather than combining two edits (both sides rewrote the same logic
-differently, one side deleted what the other changed, a migration or a lock file you
-cannot regenerate). Say which files and what each side wants. Never `git merge --abort`,
-reset or force-push on your own.
+   ```bash
+   git push -u origin HEAD
+   ```
 
-In the report, list each conflicted file and one line on how it was resolved, before the
-verdict of the run that followed.
+4. **Make sure integration runs.** This step applies only when the branch has an open pull request
+   and one of its required checks is named like `integration`. Wait about a minute for the checks
+   to appear on the pushed commit, then look:
 
-## The report
+   ```bash
+   gh pr checks --required
+   ```
 
-The report is the script's verdict, copied:
+   If the integration check shows `skipping` or `skipped`, rerun its workflow run. The run id is in
+   the check's link (`.../actions/runs/<id>/job/...`):
 
-1. The line after `== verdict`, verbatim, as the first line: `GREENLIGHT PASS  <branch>@abc1234  <run urls>`
-   or `GREENLIGHT FAIL  <branch>@abc1234`.
-2. When it merged, the `merge` line, saying the default branch was merged into the branch and
-   pushed, since that changed the user's branch.
-3. On FAIL, each `- reason` line under it, verbatim, as a bullet.
-4. One line naming the integration job(s) the script tagged `[integration]` and how long they
-   took, read from the `== jobs` table.
+   ```bash
+   gh run rerun <id>
+   ```
 
-The verdict is the script's, so the report is what the script printed:
+   Some workflows skip integration on a PR's first attempt and run it only on a rerun. Rerun once.
+   If it is still skipped after that, say so.
 
-- Output with no `== verdict` block (killed, timed out by the tool, not finished) is
-  reported as "CI did not complete", with the last lines the script printed. It is never
-  reported as passed.
-- A green jobs table above a `GREENLIGHT FAIL` is still a FAIL. The reasons say why.
-- `--latest` with a FAIL that says no run exists is reported as that; the next step is to run
-  it without `--latest`, which the user decides.
-- Uncommitted changes, a merge already in progress, committed conflict markers or a refused
-  push is a FAIL before any CI ran; the reason says which. Uncommitted changes and a refused
-  push are the user's to sort out; a merge you left in progress is yours to finish.
-- No job tagged `[integration]` means the integration tests did not run as far as this
-  verdict goes; `--match` names a different job pattern, and the user picks it.
+5. **Report.** Wait for the checks with `gh pr checks --watch`, run in the background because it
+   takes minutes. Then report the following:
+   - the merge, with any conflicts you resolved;
+   - the pushed sha;
+   - each check with its result, copied from `gh pr checks`, not guessed.
+
+   Say the integration check passed only if it ran on that sha and shows `pass`.

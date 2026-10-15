@@ -1,5 +1,22 @@
 # aj-log
 
+## 2026-10-15 — greenlight is a plain skill now, no script
+
+- Deleted `plugins/greenlight/scripts/greenlight.sh` and its tests. `SKILL.md` is five steps:
+  1. Fetch the default branch, read from `gh repo view`.
+  2. Merge it into the current branch. Claude resolves conflicts and asks when a conflict
+     needs a decision.
+  3. Push.
+  4. If the PR's required `integration` check shows `skipping`, run `gh run rerun` on that run
+     once.
+  5. Report from `gh pr checks`.
+- Version 0.3.0. Updated the manifest, plugin.json, marketplace.json and both READMEs.
+- Why: the user asked for it to be very simple. The script's PR mode also turned off when
+  workflows were named, so it dispatched its own runs and never reran the PR's skipped
+  integration check. The PR then showed 5 of its 8 checks.
+- Reinstalling the script mid-run had also crashed a running copy, with "PENDING: unbound
+  variable" and a syntax error. That cannot happen now that there is no script.
+
 ## 2026-10-14 — greenlight starts PR checks that did not run and reruns jobs that did not run
 
 - `plugins/greenlight/scripts/greenlight.sh`: with an open PR, a `pull_request` workflow with no
