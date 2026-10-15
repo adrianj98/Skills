@@ -1,5 +1,18 @@
 # aj-log
 
+## 2026-10-15 — work-band: `server` flashes blue until the port answers, then green
+
+- `register.tsx`: starting the server begins a 500 ms blink. `server` alternates between blue
+  and dim, and every 2 s it runs `curl -s -m 2 http://localhost:<port>`. While kill-port is
+  still pending or running it skips the check, so an old server about to be killed does not
+  count. The first answer (any HTTP response) sets `serve.up`, which turns `server` green
+  and cancels the timer, so the port is never checked again. A restart clears `up`.
+  Why: the user wants to see when the server actually serves, not just when turbo is running.
+- `types/index.d.ts`: `Serve.up` and `Serve.blink`.
+- `register.test.ts`: a new test checks that `server` is blue and not green before the port
+  answers, green after, and that there are no checks after that. Two tests that expected
+  green at once were updated. 87 pass.
+
 ## 2026-10-15 — work-band: keep the alertd-core gate across a hot reload
 
 - `register.tsx`: the hooks now gate on the `canServe` atom instead of a module variable.

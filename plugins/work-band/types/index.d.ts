@@ -38,6 +38,10 @@ export type Serve = {
   code?: number | null
   signal?: string
   tasks: readonly Task[]
+  // the port answered: the server is up, and the port is not checked again
+  up?: boolean
+  // on/off while it starts, so `server` flashes
+  blink?: boolean
 }
 
 declare module 'claude-code' {

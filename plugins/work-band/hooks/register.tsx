@@ -734,6 +734,38 @@ async function refreshAll($: EngineInterface) {
   }
 }
 
+// Until the server answers on its port, `server` flashes blue; once it
+// answers it turns green and the port is not checked again. The port is
+// checked only after kill-port has finished, so a server it is about to
+// kill does not count.
+const BLINK_MS = 500
+const BLINKS_PER_CHECK = 4
+let upTimer: { cancel(): void } | null = null
+
+function watchUp($: EngineInterface, mine: number) {
+  upTimer?.cancel()
+  let ticks = 0
+  const timer = $.clock.every(BLINK_MS, () =>
+    void (async () => {
+      const s = await read($, serve)
+      if (mine !== generation || s.state !== 'running' || s.up) {
+        timer.cancel()
+        if (upTimer === timer) upTimer = null
+        return
+      }
+      await update($, serve, (s): Serve => ({ ...s, blink: !s.blink }))
+      if (ticks++ % BLINKS_PER_CHECK) return
+      if (tasksOf(s).some(t => t.name === 'kill-port' && (t.state === 'pending' || t.state === 'running'))) return
+      const r = await $.process.run(['curl', '-s', '-o', '/dev/null', '-m', '2', serverUrl(await read($, port))])
+      if (r.exitCode !== 0 || mine !== generation) return
+      timer.cancel()
+      if (upTimer === timer) upTimer = null
+      await update($, serve, (s): Serve => (s.state === 'running' ? { ...s, up: true, blink: false } : s))
+    })().catch(() => {}),
+  )
+  upTimer = timer
+}
+
 async function stopServe($: EngineInterface) {
   ++generation
   if (child) {
@@ -872,6 +904,7 @@ async function restartServe($: EngineInterface) {
   const stream = $.process.spawn({ argv: SERVE_ARGV, env })
   child = stream
   await update($, serve, (): Serve => ({ state: 'running', tasks: plan ?? [] }))
+  watchUp($, mine)
   void loadPlan($, mine).catch(() => {})
 
   void (async () => {
@@ -1313,7 +1346,12 @@ export const register: Register = on => {
           ) : null}
           {isServeRepo ? (
             <Button key="serve" plain label="server" onPress={() => restartServe($)}>
-              <Text color={s.state === 'running' ? 'success' : undefined}>server</Text>
+              <Text
+                color={s.state !== 'running' ? undefined : s.up ? 'success' : s.blink ? 'blue' : undefined}
+                dimColor={s.state === 'running' && !s.up && !s.blink}
+              >
+                server
+              </Text>
             </Button>
           ) : null}
           {isServeRepo ? <Text> </Text> : null}

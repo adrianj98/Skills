@@ -255,7 +255,8 @@ for (const surface of ['terminal', 'desktop'] as const) {
     await startIn($, on, 'git@github.com:alert-d/alertd-core.git')
     const ui = await mountBand($, surface)
     await ui.press({ key: 'serve' })
-    expect((await ui.find({ type: 'Text', text: /^server$/ }))?.props.color).toBe('success')
+    // running, the port not answering yet: not green
+    expect((await ui.find({ type: 'Text', text: /^server$/ }))?.props.color).not.toBe('success')
 
     await ui.press({ key: 'menu' })
     expect(asked).toEqual(['Restart', 'Kill', 'Change port', 'Cancel'])
@@ -281,9 +282,46 @@ for (const surface of ['terminal', 'desktop'] as const) {
     await ui.press({ key: 'serve' })
     await ui.press({ key: 'serve' })
     expect(starts).toBe(2)
-    expect((await ui.find({ type: 'Text', text: /^server$/ }))?.props.color).toBe('success')
     expect((await ui.find({ type: 'Text', text: /^● serve$/ }))?.props.color).toBe('success')
     expect((await ui.find({ type: 'Text', text: /kill-port/ }))?.text).toContain('✓ kill-port')
+  })
+}
+
+for (const surface of ['terminal', 'desktop'] as const) {
+  test(`${surface}: server flashes blue until the port answers, then is green and stops checking`, async ($, on) => {
+    on('process.spawn', async function* (_$, _e, next) {
+      yield { stream: 'stdout' as const, text: '//:serve: cache bypass, force executing 1\n' }
+      await new Promise<void>(resolve => next.signal.addEventListener('abort', () => resolve()))
+      return { value: { code: null, signal: 'SIGTERM' } }
+    })
+    let answers = false
+    let checks = 0
+    const clock = mock.clock(on)
+    await startIn($, on, 'git@github.com:alert-d/alertd-core.git', '', clock, false, new Map(), argv => {
+      if (argv[0] !== 'curl') return undefined
+      checks += 1
+      return answers ? '' : undefined
+    })
+    const ui = await mountBand($, surface)
+    await ui.press({ key: 'serve' })
+    const server = async () => (await ui.find({ type: 'Text', text: /^server$/ }))?.props
+
+    const seen = new Set<unknown>()
+    for (let i = 0; i < 4; i++) {
+      await clock.advance(500)
+      seen.add((await server())?.color)
+    }
+    expect(seen.has('blue')).toBe(true)
+    expect(seen.has('success')).toBe(false)
+    expect(checks).toBeGreaterThan(0)
+
+    answers = true
+    await clock.advance(2_000)
+    expect((await server())?.color).toBe('success')
+    const after = checks
+    await clock.advance(10_000)
+    expect(checks).toBe(after)
+    expect((await server())?.color).toBe('success')
   })
 }
 
