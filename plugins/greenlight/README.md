@@ -3,6 +3,8 @@
 `/greenlight` brings a branch up to date with the default branch and makes sure its
 integration tests run. It is a skill only, with no script behind it.
 
+0. It says what it is going to do and lists the workflows it will watch, as a table: each
+   workflow, its checks, and which of them are required.
 1. It asks GitHub for the default branch (`develop`, `main`, …) and fetches it.
 2. It merges that branch into the current branch. Claude resolves any conflicts, and stops to
    ask when a conflict needs your decision.

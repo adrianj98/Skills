@@ -1,7 +1,41 @@
 ---
 name: greenlight
-description: Merge the repository's default branch into the current branch, push it, and make sure the pull request's required integration check actually runs, rerunning it when it was skipped, and fix the code when a check fails. Use when the user asks to run CI on their branch, to bring a branch up to date with develop or main and test it, or for a greenlight before a merge.
+description: Say what it will do and list the workflows it will watch, then merge the repository's default branch into the current branch, push it, and make sure the pull request's required integration check actually runs, rerunning it when it was skipped, and fix the code when a check fails. Use when the user asks to run CI on their branch, to bring a branch up to date with develop or main and test it, or for a greenlight before a merge.
 ---
+
+0. **Say what you are going to do, before doing anything.** Gather the facts:
+
+   ```bash
+   gh repo view --json defaultBranchRef -q .defaultBranchRef.name    # the default branch
+   git branch --show-current                                         # this branch
+   gh pr view --json number,url,state -q '"#\(.number) \(.url) \(.state)"'
+   gh pr checks --json workflow,name -q '.[] | "\(.workflow)\t\(.name)"'
+   gh pr checks --required --json name -q '.[].name'
+   ```
+
+   Then tell the user, in this shape:
+
+   > Greenlight on `<branch>` (PR #N):
+   > 1. Fetch `origin/<default>` and merge it into `<branch>`. I resolve any conflicts, and ask
+   >    you when one needs your decision.
+   > 2. Push the merge. That makes GitHub run the PR's checks on the new commit.
+   > 3. If the required integration check is skipped, rerun it once.
+   > 4. Wait for the checks. If one fails, fix the code and push again, up to three times.
+   > 5. Report each check's result.
+   >
+   > Workflows I will watch:
+   >
+   > | Workflow | Checks | Required |
+   > |---|---|---|
+   > | Unit Test | vitest, prettier | vitest |
+   > | Integration Test | integration, integration (server), integration (rest) | integration |
+   > | … | … | |
+
+   Build the table from the PR's checks: one row per workflow, its check names, and which of
+   them are required. Without an open PR, list the files in `.github/workflows/` whose `on:`
+   has `pull_request` or `push`, and say that no PR exists, so no checks are required. Then go
+   straight on to step 1; do not wait for a reply. After the push (step 3), compare the checks
+   that appear with this list. Name any that are new or that never started.
 
 1. **Pull the default branch.** Ask GitHub which branch is the default; never assume `main`.
 

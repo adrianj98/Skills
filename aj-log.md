@@ -1,5 +1,17 @@
 # aj-log
 
+## 2026-10-15 — greenlight says what it will do and which workflows it watches
+
+- `SKILL.md`: new step 0. Before anything else, Claude states the plan (merge, push, rerun a
+  skipped integration check, fix failures, report). It shows a table of the workflows it will
+  watch: one row per workflow, its check names, and which are required. The rows come from
+  `gh pr checks --json workflow,name` and `--required`; without a PR, from the workflow files
+  that trigger on `pull_request` or `push`. After the push, it names any check that is new or
+  that never started.
+- Version 0.5.0.
+- Why: the user asked for the skill to explain what it will do and to list the workflows it
+  will watch.
+
 ## 2026-10-15 — work-band: blinking that never stopped; duplicate servers after a reload
 
 - `register.tsx`, the port check never ran. It waited for kill-port to finish, but turbo
