@@ -1,5 +1,13 @@
 # aj-log
 
+## 2026-10-15 — work-band: keep the alertd-core gate across a hot reload
+
+- `register.tsx`: the hooks now gate on the `canServe` atom instead of a module variable.
+  Why: installing the mod hot-reloads it in running sessions without re-running
+  `session.start`. The module variable reset to false, and the band disappeared in
+  alertd-core sessions too. State survives a reload, so the band stays in alertd-core and
+  stays off elsewhere. 85 tests pass.
+
 ## 2026-10-15 — work-band runs only in alert-d/alertd-core
 
 - `plugins/work-band/hooks/register.tsx`: at session start the mod reads `git remote get-url
