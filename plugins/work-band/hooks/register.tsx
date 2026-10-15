@@ -48,8 +48,11 @@ const logView = atom({ plugin: 'work-band', key: 'logView' } as const, { task: '
 
 // `t` is the shell alias `npx turbo run serve --ui=tui`. The TUI needs a
 // terminal, which a spawned child has none of, so it streams instead.
-// The button runs alertd-core's server, so it shows only in that repo.
+// The band is for alertd-core only: in any other repo the mod registers
+// nothing and draws nothing.
 const SERVE_REPO = /[:/]alert-d\/alertd-core(\.git)?$/
+// Set at session start from the origin remote.
+let active = false
 const SERVE_ARGV = ['npx', 'turbo', 'run', 'serve', '--ui=stream']
 const DRY_ARGV = ['npx', 'turbo', 'run', 'serve', '--dry=json']
 // Whichever Jira MCP server is connected: claude.ai's "Atlassian Rovo", its
@@ -680,9 +683,11 @@ async function changeJiraStatus($: EngineInterface) {
   await refreshJira($, await read($, pr))
 }
 
-async function checkRepo($: EngineInterface) {
+async function checkRepo($: EngineInterface): Promise<boolean> {
   const { exitCode, stdout } = await $.process.run(['git', 'remote', 'get-url', 'origin'])
-  await update($, canServe, () => exitCode === 0 && SERVE_REPO.test(stdout.trim()))
+  const ok = exitCode === 0 && SERVE_REPO.test(stdout.trim())
+  await update($, canServe, () => ok)
+  return ok
 }
 
 // The model is told only of a merge this session saw happen (open, then
@@ -910,6 +915,8 @@ async function restartServe($: EngineInterface) {
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     const started = await next(e)
+    active = await checkRepo($)
+    if (!active) return started
     await $.command.register({ name: 'wb', description: 'Show or hide the PR / Jira / t band', immediate: true })
     // Listed from turn one, in front of ToolSearch, so the model reaches for it.
     await $.tool
@@ -924,7 +931,6 @@ export const register: Register = on => {
         isDeferred: false,
       })
       .catch(() => {})
-    void checkRepo($)
     void refreshAccount($).catch(() => {})
     void $.process.run(['git', 'rev-parse', '--show-toplevel']).then(r => {
       if (r.exitCode === 0) repoTop = r.stdout.trim()
@@ -939,6 +945,7 @@ export const register: Register = on => {
 
   on('turn.complete', async ($, e, next) => {
     const result = await next(e)
+    if (!active) return result
     if ((await $.clock.now()) - lastPrFetch > MIN_PR_GAP_MS) void refreshAll($)
     if (await isFilesOpen($)) void refreshFiles($).catch(() => {})
     return result
@@ -953,7 +960,7 @@ export const register: Register = on => {
   // tool is on offer.
   on('prompt.compose', async ($, e, next) => {
     const { sections } = await next(e)
-    if (!e.tools.includes(TOPIC_TOOL)) return { sections }
+    if (!active || !e.tools.includes(TOPIC_TOOL)) return { sections }
     return { sections: [...sections, { id: 'work-band:topic', text: TOPIC_PROMPT, scope: 'session' }] }
   })
 
@@ -961,7 +968,7 @@ export const register: Register = on => {
   // model compares and calls set_topic when the work moved. A meta prompt
   // (an engine notice) is not the person and gets nothing.
   on('prompt.submit', async ($, e, next) => {
-    if ((e as { isMeta?: true }).isMeta) return next(e)
+    if (!active || (e as { isMeta?: true }).isMeta) return next(e)
     const nudge = topicNudge(await read($, topic))
     return next({ ...e, context: [...(e.context ?? []), nudge] })
   })
@@ -972,6 +979,7 @@ export const register: Register = on => {
   // the model names its topic through set_topic and the band draws it; the
   // file being edited spins in the Files pane, its folders opened.
   on('tool.call', async ($, e, next) => {
+    if (!active) return next(e)
     if ((e.tool as string) === TOPIC_TOOL) {
       const topics = parseTopics(e)
       if (topics === undefined || topics.length === 0) return { deny: 'set_topic takes { topics: string[] }, one to three short labels' }
@@ -1156,7 +1164,7 @@ export const register: Register = on => {
   })
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
-    if (e.props.hasSurvey || (await read($, isHidden))) return next(e)
+    if (!active || e.props.hasSurvey || (await read($, isHidden))) return next(e)
 
     const [p, j, s, isServeRepo, at, d, acct, topics] = await Promise.all([
       read($, pr),

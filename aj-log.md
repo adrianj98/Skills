@@ -1,5 +1,14 @@
 # aj-log
 
+## 2026-10-15 — work-band runs only in alert-d/alertd-core
+
+- `plugins/work-band/hooks/register.tsx`: at session start the mod reads `git remote get-url
+  origin`. Outside alert-d/alertd-core it returns at once: no `/wb`, no `set_topic` tool, no
+  polling of gh or Jira, no band, and no topic prompt or nudge. Every other hook passes
+  straight through. Why: the user wants the band only in that repo.
+- `register.test.ts`: the "outside alertd-core" test now checks for no band, no command, no
+  tool and no gh calls. 85 pass. Installed to `~/.claude/mods/work-band`.
+
 ## 2026-10-15 — greenlight fixes failing checks
 
 - `SKILL.md`: added a step for failing checks. Claude reads `gh run view --log-failed`, fixes the

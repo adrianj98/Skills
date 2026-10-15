@@ -54,6 +54,7 @@ const ran: (readonly string[])[] = []
 const opened = (url: string) => ran.some(a => a[0] === 'open' && a[1] === url)
 
 const registered: string[] = []
+const commands: string[] = []
 const startIn = async ($: Engine, on: On, origin: string, prJson: string | (() => string) = '', clock = mock.clock(on), ownJira = false, store = new Map<string, unknown>(),
   git?: (argv: readonly string[]) => string | undefined,
 ) => {
@@ -95,7 +96,10 @@ const startIn = async ($: Engine, on: On, origin: string, prJson: string | (() =
   if (!ownJira) on('tool.list', () => ({ value: [] }) as never)
   if (!ownJira) on('tool.check', () => ({ decision: 'ask' }) as never)
   on('session.start', (_$, e) => ({ cwd: e.cwd }))
-  on('command.register', (_$, e) => ({ value: { command: e.name } }))
+  on('command.register', (_$, e) => {
+    commands.push(e.name)
+    return { value: { command: e.name } }
+  })
   on('tool.register', (_$, e) => {
     registered.push(e.name)
     return { value: { tool: `mcp__work-band__${e.name}` } } as never
@@ -206,11 +210,17 @@ for (const surface of ['terminal', 'desktop'] as const) {
 }
 
 for (const surface of ['terminal', 'desktop'] as const) {
-  test(`${surface}: outside alertd-core there is no t button`, async ($, on) => {
+  test(`${surface}: outside alertd-core there is no band, no /wb and no set_topic`, async ($, on) => {
+    registered.length = 0
+    commands.length = 0
+    ran.length = 0
     await startIn($, on, 'git@github.com:someone/else.git')
     const ui = await mountBand($, surface)
     expect(await ui.find({ key: 'serve' })).toBe(undefined)
-    expect(await ui.find({ type: 'Text', text: 'no PR' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: 'no PR' })).toBe(undefined)
+    expect(commands).toEqual([])
+    expect(registered).toEqual([])
+    expect(ran.filter(a => a[0] === 'gh').length).toBe(0)
   })
 }
 
