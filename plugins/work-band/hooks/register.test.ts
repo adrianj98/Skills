@@ -58,13 +58,14 @@ const opened = (url: string) => ran.some(a => a[0] === 'open' && a[1] === url)
 const registered: string[] = []
 const commands: string[] = []
 const startIn = async ($: Engine, on: On, origin: string, prJson: string | (() => string) = '', clock = mock.clock(on), ownJira = false, store = new Map<string, unknown>(),
-  git?: (argv: readonly string[]) => string | undefined,
+  git?: (argv: readonly string[]) => string | null | undefined,
 ) => {
   const prNow = () => (typeof prJson === 'function' ? prJson() : prJson)
   void clock
   on('process.run', (_$, e) => {
     ran.push(e.argv)
     const out = git?.(e.argv)
+    if (out === null) return { value: { exitCode: 1, stdout: '', stderr: 'fatal', isStdoutTruncated: false, isStderrTruncated: false } }
     if (out !== undefined) {
       return { value: { exitCode: 0, stdout: out, stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
     }
@@ -1292,4 +1293,49 @@ test('serveTrees: the servers this Claude started and everything under them, no 
   expect(serveTrees(ps, 100).sort()).toEqual([200, 201, 202, 203, 204, 205])
   expect(serveTrees(ps, 400).sort()).toEqual([401, 402])
   expect(serveTrees(ps, 999)).toEqual([])
+})
+
+test('a remote check that failed at start is tried again, and a match turns the band on', async ($, on) => {
+  const clock = mock.clock(on)
+  let gitWorks = false
+  await startIn($, on, 'git@github.com:alert-d/alertd-core.git', '', clock, false, new Map(), argv =>
+    argv[0] === 'git' && argv.includes('remote') && !gitWorks ? null : undefined,
+  )
+  let ui = await mountBand($, 'terminal')
+  expect(await ui.find({ type: 'Text', text: 'no PR' })).toBe(undefined)
+  gitWorks = true
+  await clock.advance(31_000)
+  ui = await mountBand($, 'terminal')
+  expect(await ui.find({ type: 'Text', text: 'no PR' })).toBeDefined()
+})
+
+test('in another repo the remote is checked once, never again', async ($, on) => {
+  const clock = mock.clock(on)
+  let checks = 0
+  await startIn($, on, 'git@github.com:someone/else.git', '', clock, false, new Map(), argv => {
+    if (argv[0] === 'git' && argv.includes('remote')) checks += 1
+    return undefined
+  })
+  for (let i = 0; i < 5; i++) {
+    await clock.advance(60_000)
+    await mountBand($, 'terminal')
+  }
+  expect(checks).toBe(1)
+})
+
+test('outside a git repo the remote is tried a few times, then never again', async ($, on) => {
+  const clock = mock.clock(on)
+  let checks = 0
+  await startIn($, on, '', '', clock, false, new Map(), argv => {
+    if (argv[0] === 'git' && argv.includes('remote')) {
+      checks += 1
+      return null
+    }
+    return undefined
+  })
+  for (let i = 0; i < 20; i++) await clock.advance(30_000)
+  expect(checks).toBeLessThanOrEqual(6)
+  const after = checks
+  for (let i = 0; i < 20; i++) await clock.advance(30_000)
+  expect(checks).toBe(after)
 })

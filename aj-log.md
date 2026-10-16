@@ -1,5 +1,22 @@
 # aj-log
 
+## 2026-10-16 — work-band: a failed repo check no longer switches the band off for good
+
+- `register.tsx`: `checkRepo` leaves `canServe` as it was when `git remote get-url origin`
+  fails. Only a remote that answers and is not alertd-core turns the band off. Why: a session
+  whose check failed (likely on `/clear` re-running session.start) kept the band off, and
+  `set_topic` unanswered, for the rest of the session.
+- While git has not answered, the band tries again from a 30 s timer armed at session start and
+  from the turn, prompt and tool hooks. It stops at 5 tries, since outside a git repo git never
+  answers. A match runs `activate` (`/wb`, `set_topic`, the PR poll, the port), which moved out
+  of session.start.
+- Once git has answered with another repo, the band never checks again. A hot reload forgets
+  that, so it checks once more after one. The band's draw only reads the flag, since a render
+  may not write state.
+- Tests: a failed check is retried and turns the band on; another repo is checked once; a
+  non-git folder stops after a few tries. 91 pass.
+- Left `~/.claude/dev-mods/` alone: those are per-session dev copies, not this install.
+
 ## 2026-10-16 — work-band: the merge message states what happened, nothing to do
 
 - `register.tsx`: `mergePrompt` now carries only facts: the PR number and title, the base

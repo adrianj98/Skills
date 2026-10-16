@@ -682,11 +682,46 @@ async function changeJiraStatus($: EngineInterface) {
   await refreshJira($, await read($, pr))
 }
 
+// A check that could not run (git failed) leaves the flag as it was, so it
+// never turns off a band that is on; only a remote that is not alertd-core
+// turns it off.
 async function checkRepo($: EngineInterface): Promise<boolean> {
   const { exitCode, stdout } = await $.process.run(['git', 'remote', 'get-url', 'origin'])
-  const ok = exitCode === 0 && SERVE_REPO.test(stdout.trim())
+  if (exitCode !== 0) return read($, canServe)
+  answered = true
+  const ok = SERVE_REPO.test(stdout.trim())
   await update($, canServe, () => ok)
   return ok
+}
+
+// Whether the band is on in this session. Once git has named the remote,
+// that answer stands: another repo is never checked again. Only while git
+// has not answered (the check failed) does a hook try again, at most every
+// RECHECK_MS and MAX_RETRIES times in all, and a match switches the band on
+// then and there. A hot reload
+// forgets `answered`, so another repo is checked once more after one.
+const RECHECK_MS = 30_000
+const MAX_RETRIES = 5
+let answered = false
+let lastCheck = Number.NEGATIVE_INFINITY
+let checking: Promise<boolean> | null = null
+let failedChecks = 0
+async function isOn($: EngineInterface): Promise<boolean> {
+  if (await read($, canServe)) return true
+  if (answered || failedChecks >= MAX_RETRIES) return false
+  const now = await $.clock.now()
+  if (now - lastCheck < RECHECK_MS) return false
+  lastCheck = now
+  checking ??= checkRepo($)
+    .then(async ok => {
+      if (!answered) failedChecks += 1
+      if (ok) await activate($)
+      return ok
+    })
+    .finally(() => {
+      checking = null
+    })
+  return checking
 }
 
 // The model is told only of a merge this session saw happen (open, then
@@ -992,43 +1027,64 @@ async function restartServe($: EngineInterface) {
   })
 }
 
+// What the session does once it is in alertd-core: the /wb command, the
+// set_topic tool, the PR poll and the server's port.
+async function activate($: EngineInterface) {
+  await $.command.register({ name: 'wb', description: 'Show or hide the PR / Jira / t band', immediate: true }).catch(() => {})
+  // Listed from turn one, in front of ToolSearch, so the model reaches for it.
+  await $.tool
+    .register({
+      name: 'set_topic',
+      description: 'Show on the work band what you are working on now: one to three short labels. Call it when you start and whenever the topic changes.',
+      inputSchema: {
+        type: 'object',
+        properties: { topics: { type: 'array', items: { type: 'string' }, minItems: 1, maxItems: TOPIC_MAX, description: 'Short labels, two to four words each' } },
+        required: ['topics'],
+      },
+      isDeferred: false,
+    })
+    .catch(() => {})
+  void refreshAccount($).catch(() => {})
+  void $.process.run(['git', 'rev-parse', '--show-toplevel']).then(r => {
+    if (r.exitCode === 0) repoTop = r.stdout.trim()
+  })
+  void refreshAll($)
+  ensurePolling($)
+  const stored = await $.store.get('port')
+  if (typeof stored === 'number' && parsePort(String(stored)) !== undefined) await update($, port, () => stored)
+  if ((await read($, serve)).state !== 'running') void pickFreePort($).catch(() => {})
+}
+
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     const started = await next(e)
-    if (!(await checkRepo($))) return started
-    await $.command.register({ name: 'wb', description: 'Show or hide the PR / Jira / t band', immediate: true })
-    // Listed from turn one, in front of ToolSearch, so the model reaches for it.
-    await $.tool
-      .register({
-        name: 'set_topic',
-        description: 'Show on the work band what you are working on now: one to three short labels. Call it when you start and whenever the topic changes.',
-        inputSchema: {
-          type: 'object',
-          properties: { topics: { type: 'array', items: { type: 'string' }, minItems: 1, maxItems: TOPIC_MAX, description: 'Short labels, two to four words each' } },
-          required: ['topics'],
-        },
-        isDeferred: false,
-      })
-      .catch(() => {})
-    void refreshAccount($).catch(() => {})
-    void $.process.run(['git', 'rev-parse', '--show-toplevel']).then(r => {
-      if (r.exitCode === 0) repoTop = r.stdout.trim()
-    })
-    void refreshAll($)
-    ensurePolling($)
-    const stored = await $.store.get('port')
-    if (typeof stored === 'number' && parsePort(String(stored)) !== undefined) await update($, port, () => stored)
-    if ((await read($, serve)).state !== 'running') void pickFreePort($).catch(() => {})
+    lastCheck = await $.clock.now()
+    answered = false
+    failedChecks = 0
+    if (await checkRepo($)) await activate($)
+    else if (!answered) {
+      // git failed: try again until it answers, at most MAX_RETRIES times,
+      // since outside a git repo it never will
+      let tries = 0
+      const retry = $.clock.every(RECHECK_MS, () =>
+        void isOn($)
+          .then(() => {
+            if (answered || ++tries >= MAX_RETRIES) retry.cancel()
+          })
+          .catch(() => {}),
+      )
+    }
     return started
   })
 
   on('turn.complete', async ($, e, next) => {
     const result = await next(e)
-    if (!(await read($, canServe))) return result
+    if (!(await isOn($))) return result
     if ((await $.clock.now()) - lastPrFetch > MIN_PR_GAP_MS) void refreshAll($)
     if (await isFilesOpen($)) void refreshFiles($).catch(() => {})
     return result
   })
+
 
   on('command.run', { command: 'wb' }, async $ => {
     const hidden = await update($, isHidden, h => !h)
@@ -1039,7 +1095,7 @@ export const register: Register = on => {
   // tool is on offer.
   on('prompt.compose', async ($, e, next) => {
     const { sections } = await next(e)
-    if (!(await read($, canServe)) || !e.tools.includes(TOPIC_TOOL)) return { sections }
+    if (!(await isOn($)) || !e.tools.includes(TOPIC_TOOL)) return { sections }
     return { sections: [...sections, { id: 'work-band:topic', text: TOPIC_PROMPT, scope: 'session' }] }
   })
 
@@ -1047,7 +1103,7 @@ export const register: Register = on => {
   // model compares and calls set_topic when the work moved. A meta prompt
   // (an engine notice) is not the person and gets nothing.
   on('prompt.submit', async ($, e, next) => {
-    if (!(await read($, canServe)) || (e as { isMeta?: true }).isMeta) return next(e)
+    if (!(await isOn($)) || (e as { isMeta?: true }).isMeta) return next(e)
     const nudge = topicNudge(await read($, topic))
     return next({ ...e, context: [...(e.context ?? []), nudge] })
   })
@@ -1058,7 +1114,7 @@ export const register: Register = on => {
   // the model names its topic through set_topic and the band draws it; the
   // file being edited spins in the Files pane, its folders opened.
   on('tool.call', async ($, e, next) => {
-    if (!(await read($, canServe))) return next(e)
+    if (!(await isOn($))) return next(e)
     if ((e.tool as string) === TOPIC_TOOL) {
       const topics = parseTopics(e)
       if (topics === undefined || topics.length === 0) return { deny: 'set_topic takes { topics: string[] }, one to three short labels' }
