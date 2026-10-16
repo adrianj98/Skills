@@ -22,6 +22,7 @@ import {
   keepLines,
   mergePlan,
   mergePrompt,
+  parseMergeFacts,
   fitWidth,
   firstRowWidth,
   parseDry,
@@ -765,9 +766,18 @@ for (const surface of ['terminal', 'desktop'] as const) {
 }
 
 test('the merge prompt names the PR and its Jira issue', () => {
-  expect(mergePrompt(2902, 'feat: AL-4169 x', 'AL-4169', 'develop')).toBe(
-    'PR #2902 ("feat: AL-4169 x") has just been merged into develop; the work-band mod saw it change from open to merged. Its Jira issue is AL-4169: update it for the merge, following this project\'s Jira rules. Also do anything else this session or the project\'s instructions say should happen once this PR merges, then say what you updated.',
+  expect(
+    mergePrompt({ number: 2902, title: 'feat: AL-4169 x', base: 'develop', url: 'https://github.com/o/r/pull/2902' }, 'AL-4169', {
+      by: 'adrianj98',
+      at: '2026-10-16T14:02:00Z',
+      commit: 'abc1234def',
+    }),
+  ).toBe(
+    'PR #2902 ("feat: AL-4169 x") was merged into develop by adrianj98 at 2026-10-16T14:02:00Z, merge commit abc1234. https://github.com/o/r/pull/2902 Jira issue: AL-4169.',
   )
+  expect(mergePrompt({ number: 7, title: 'x' }, undefined)).toBe('PR #7 ("x") was merged. No Jira issue key in the PR title or the branch name.')
+  expect(parseMergeFacts('{"mergedBy":{"login":"a"},"mergedAt":"t","mergeCommit":{"oid":"c"}}')).toEqual({ by: 'a', at: 't', commit: 'c' })
+  expect(parseMergeFacts('nope')).toEqual({})
 })
 
 test('open → merged tells the model once; a PR merged before the session does not', async ($, on) => {
@@ -786,7 +796,10 @@ test('open → merged tells the model once; a PR merged before the session does 
   state = 'MERGED'
   await clock.advance(120_000)
   await clock.advance(120_000)
-  expect(prompts).toEqual([mergePrompt(2902, 'feat(mateoas): AL-4169 route tables', 'AL-4169')])
+  expect(prompts.length).toBe(1)
+  expect(prompts[0]).toStartWith('PR #2902 ("feat(mateoas): AL-4169 route tables") was merged')
+  expect(prompts[0]).toContain('Jira issue: AL-4169.')
+  expect(prompts[0]).not.toMatch(/update|should|ask/i)
 })
 
 test('a PR already merged when the session starts tells nothing', async ($, on) => {

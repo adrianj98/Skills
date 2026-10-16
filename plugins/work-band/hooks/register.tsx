@@ -691,14 +691,26 @@ async function checkRepo($: EngineInterface): Promise<boolean> {
 
 // The model is told only of a merge this session saw happen (open, then
 // merged), never of a PR that was already merged when the session started.
-export const mergePrompt = (prNumber: number, title: string, jiraKey: string | undefined, base?: string): string =>
+// It is told what happened, not what to do about it.
+export type MergeFacts = { by?: string; at?: string; commit?: string }
+export const mergePrompt = (pr: { number: number; title: string; base?: string; url?: string }, jiraKey: string | undefined, facts: MergeFacts = {}): string =>
   [
-    `PR #${prNumber} ("${title}") has just been merged${base ? ` into ${base}` : ''}; the work-band mod saw it change from open to merged.`,
-    jiraKey
-      ? `Its Jira issue is ${jiraKey}: update it for the merge, following this project's Jira rules.`
-      : 'No Jira issue key was found in the PR title or the branch name; ask which issue, if any, to update.',
-    'Also do anything else this session or the project\'s instructions say should happen once this PR merges, then say what you updated.',
-  ].join(' ')
+    `PR #${pr.number} ("${pr.title}") was merged${pr.base ? ` into ${pr.base}` : ''}${facts.by ? ` by ${facts.by}` : ''}${facts.at ? ` at ${facts.at}` : ''}${facts.commit ? `, merge commit ${facts.commit.slice(0, 7)}` : ''}.`,
+    pr.url ?? '',
+    jiraKey ? `Jira issue: ${jiraKey}.` : 'No Jira issue key in the PR title or the branch name.',
+  ]
+    .filter(Boolean)
+    .join(' ')
+
+// Who merged it, when, and the merge commit, read once when the merge is seen.
+export const parseMergeFacts = (json: string): MergeFacts => {
+  try {
+    const j = JSON.parse(json) as { mergedBy?: { login?: string }; mergedAt?: string; mergeCommit?: { oid?: string } }
+    return { by: j.mergedBy?.login, at: j.mergedAt, commit: j.mergeCommit?.oid }
+  } catch {
+    return {}
+  }
+}
 
 async function tellIfMerged($: EngineInterface, before: Pr | null, after: Pr | null) {
   if (!before || !after || before.number !== after.number) return
@@ -709,7 +721,9 @@ async function tellIfMerged($: EngineInterface, before: Pr | null, after: Pr | n
   const branch = (await $.process.run(['git', 'branch', '--show-current'])).stdout.trim()
   const key = (after.title.match(ISSUE_KEY) ?? branch.match(ISSUE_KEY))?.[0]
   $.ui.toast(`PR #${after.number} merged`)
-  void $.prompt.submit({ text: mergePrompt(after.number, after.title, key, after.base) })
+  const got = await $.process.run(['gh', 'pr', 'view', String(after.number), '--json', 'mergedBy,mergedAt,mergeCommit'])
+  const facts = got.exitCode === 0 ? parseMergeFacts(got.stdout) : {}
+  void $.prompt.submit({ text: mergePrompt(after, key, facts) })
 }
 
 async function refreshDiff($: EngineInterface, current: Pr | null) {

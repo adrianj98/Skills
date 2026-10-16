@@ -1,5 +1,16 @@
 # aj-log
 
+## 2026-10-16 — work-band: the merge message states what happened, nothing to do
+
+- `register.tsx`: `mergePrompt` now carries only facts: the PR number and title, the base
+  branch, who merged it, when, the merge commit, the PR link, and the Jira key (or that there
+  is none). It holds no instructions, Jira or otherwise. Who, when and the commit come from a
+  single `gh pr view <n> --json mergedBy,mergedAt,mergeCommit` when the merge is seen
+  (`parseMergeFacts`). Why: the user wants the band to report the action and leave what to
+  do to the agent.
+- `register.test.ts`: tests for the message with and without facts, for `parseMergeFacts`,
+  and that the live merge message holds no instructions. 88 pass.
+
 ## 2026-10-16 — work-band: always tell the agent when the PR merges
 
 - `register.tsx`: a hot reload of the mod cancelled the 2-minute PR poll, and nothing re-armed
