@@ -58,6 +58,8 @@ declare module 'claude-code' {
       account: Account | null
       // What Claude says it is working on: the labels set_topic was last called with.
       topic: string[]
+      // the checked-out branch; '' when HEAD is detached
+      branch: string
     }
   }
 }

@@ -44,6 +44,9 @@ const account = atom({ plugin: 'work-band', key: 'account' } as const, null as A
 // PRs whose merge this session already told the model about.
 const mergedTold = atom({ plugin: 'work-band', key: 'mergedTold' } as const, [] as number[])
 // Which task's logs the pane shows; `tick` changes to redraw it.
+// The branch checked out in the session's repo, shown first on the band.
+const branch = atom({ plugin: 'work-band', key: 'branch' } as const, '')
+const BRANCH_MAX = 40
 const logView = atom({ plugin: 'work-band', key: 'logView' } as const, { task: '', tick: 0 })
 
 // `t` is the shell alias `npx turbo run serve --ui=tui`. The TUI needs a
@@ -61,14 +64,14 @@ export const pickJiraTool = (names: readonly string[], op = 'getJiraIssue'): str
 
 // Plain text of the band's first row, as wide as it is drawn, so the Jira
 // part can move to a row of its own when the row would not fit `columns`.
-export const firstRowWidth = (parts: { pr: Pr | null; diff: DiffStat | null; jira: Jira | null; serve: string; plan: string | undefined; topic?: string }): number => {
+export const firstRowWidth = (parts: { pr: Pr | null; diff: DiffStat | null; jira: Jira | null; serve: string; plan: string | undefined; topic?: string; branch?: string }): number => {
   const { pr: p, diff: d, jira: j } = parts
   const diffText = d ? `+${d.added} −${d.removed}${p ? '' : ` vs ${d.base}`}` : 'diff'
   const prText = p
     ? `PR #${p.number} ${p.isDraft ? 'draft' : p.state} · ${diffText} · ✓${p.passed} ✗${p.failed} …${p.pending}`
     : `no PR · ${diffText}`
   const jiraText = j ? `${j.key} ${'title' in j ? `${j.status ? `${j.status} ` : ''}${j.title}` : j.error}` : 'no Jira key'
-  return prText.length + 3 + jiraText.length + (parts.topic ? 3 + parts.topic.length : 0) + parts.serve.length + (parts.plan ? 3 + parts.plan.length : 0)
+  return (parts.branch ? parts.branch.length + 3 : 0) + prText.length + 3 + jiraText.length + (parts.topic ? 3 + parts.topic.length : 0) + parts.serve.length + (parts.plan ? 3 + parts.plan.length : 0)
 }
 
 // The labels the model handed set_topic, trimmed, blanks dropped, at most
@@ -783,6 +786,8 @@ function ensurePolling($: EngineInterface) {
 async function refreshAll($: EngineInterface) {
   try {
     const before = await read($, pr)
+    const head = await $.process.run(['git', 'branch', '--show-current'])
+    if (head.exitCode === 0) await update($, branch, () => head.stdout.trim())
     const current = await refreshPr($)
     await refreshDiff($, current)
     await tellIfMerged($, before, current)
@@ -1303,7 +1308,7 @@ export const register: Register = on => {
     ensurePolling($)
     if (e.props.hasSurvey || (await read($, isHidden))) return next(e)
 
-    const [p, j, s, isServeRepo, at, d, acct, topics] = await Promise.all([
+    const [p, j, s, isServeRepo, at, d, acct, topics, head] = await Promise.all([
       read($, pr),
       read($, jira),
       read($, serve),
@@ -1312,8 +1317,10 @@ export const register: Register = on => {
       read($, diffStat),
       read($, account),
       read($, topic),
+      read($, branch),
     ])
     const topicLabel = topics.length ? topicText(topics) : undefined
+    const branchLabel = head ? fitWidth(head, BRANCH_MAX) : ''
     const { Box, Button, Text } = $.ui.resolve(e)
 
     // A Button cannot sit inside a Text, so the PR part is a list of the
@@ -1411,7 +1418,7 @@ export const register: Register = on => {
     // to the band, so the band is three rows rather than a wrapped one.
     const serveText = isServeRepo ? `   [ server :${at} ^ ]${exitedLabel ? ` ${exitedLabel}` : ''}` : ''
     const jiraOnOwnRow =
-      j !== null && 'title' in j && firstRowWidth({ pr: p, diff: d, jira: j, serve: serveText, plan: acct?.plan, topic: topicLabel }) > e.props.bodyColumns
+      j !== null && 'title' in j && firstRowWidth({ pr: p, diff: d, jira: j, serve: serveText, plan: acct?.plan, topic: topicLabel, branch: branchLabel }) > e.props.bodyColumns
     const jiraRow =
       jiraOnOwnRow && j && 'title' in j ? (
         <Box>
@@ -1436,6 +1443,12 @@ export const register: Register = on => {
     return (
       <Box flexDirection="column">
         <Box>
+          {branchLabel ? (
+            <Text key="branch" dimColor>
+              {branchLabel}
+              {'   '}
+            </Text>
+          ) : null}
           {prPart}
           {jiraOnOwnRow ? null : <Text dimColor>   </Text>}
           {jiraOnOwnRow ? null : jiraPart}

@@ -1,5 +1,15 @@
 # aj-log
 
+## 2026-10-16 — work-band shows the branch
+
+- `register.tsx`: a `branch` atom is filled from `git branch --show-current` on each refresh
+  (session start, every 2 min, after a turn). It is drawn dim at the start of the band's first
+  row and cut to 40 characters. A detached HEAD shows nothing. `firstRowWidth` counts it, so
+  the Jira title still moves to its own row when the row is too wide. Why: the user asked for
+  the branch name on the band.
+- `types/index.d.ts`: `branch: string` in the state contract.
+- Tests: the band starts with the branch, and the width includes it. 92 pass.
+
 ## 2026-10-16 — work-band: a failed repo check no longer switches the band off for good
 
 - `register.tsx`: `checkRepo` leaves `canServe` as it was when `git remote get-url origin`

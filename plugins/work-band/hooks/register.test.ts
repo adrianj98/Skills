@@ -1195,6 +1195,7 @@ for (const surface of ['terminal', 'desktop'] as const) {
 test('the topic counts toward the first row, so a long one moves Jira to its own row', () => {
   const pr = { number: 1, state: 'open', isDraft: false, passed: 1, failed: 0, pending: 0, title: 't' }
   const base = firstRowWidth({ pr, diff: null, jira: { key: 'AL-1', title: 'Short' }, serve: '', plan: undefined })
+  expect(firstRowWidth({ pr, diff: null, jira: { key: 'AL-1', title: 'Short' }, serve: '', plan: undefined, branch: 'main' })).toBe(base + 3 + 'main'.length)
   expect(firstRowWidth({ pr, diff: null, jira: { key: 'AL-1', title: 'Short' }, serve: '', plan: undefined, topic: 'a · b' })).toBe(base + 3 + 'a · b'.length)
 })
 
@@ -1338,4 +1339,15 @@ test('outside a git repo the remote is tried a few times, then never again', asy
   const after = checks
   for (let i = 0; i < 20; i++) await clock.advance(30_000)
   expect(checks).toBe(after)
+})
+
+test('the band starts with the branch', async ($, on) => {
+  const clock = mock.clock(on)
+  await startIn($, on, 'git@github.com:alert-d/alertd-core.git', '', clock, false, new Map(), argv =>
+    argv[0] === 'git' && argv[1] === 'branch' && argv.includes('--show-current') ? 'feature/app-tools-in-configs-yaml\n' : undefined,
+  )
+  await clock.advance(1)
+  const ui = await mountBand($, 'terminal')
+  expect(await ui.find({ type: 'Text', text: 'feature/app-tools-in-configs-yaml   ' })).toBeDefined()
+  expect((await ui.findAll({ type: 'Box' }))[1]!.text).toStartWith('feature/app-tools-in-configs-yaml   no PR')
 })
