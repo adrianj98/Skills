@@ -691,12 +691,13 @@ async function checkRepo($: EngineInterface): Promise<boolean> {
 
 // The model is told only of a merge this session saw happen (open, then
 // merged), never of a PR that was already merged when the session started.
-export const mergePrompt = (prNumber: number, title: string, jiraKey: string | undefined): string =>
+export const mergePrompt = (prNumber: number, title: string, jiraKey: string | undefined, base?: string): string =>
   [
-    `PR #${prNumber} ("${title}") has just been merged; the work-band mod saw it change from open to merged.`,
+    `PR #${prNumber} ("${title}") has just been merged${base ? ` into ${base}` : ''}; the work-band mod saw it change from open to merged.`,
     jiraKey
-      ? `Its Jira issue is ${jiraKey}. Update ${jiraKey} for the merge, following this project's Jira rules.`
-      : 'No Jira issue key was found in the PR title or the branch name; ask which issue to update.',
+      ? `Its Jira issue is ${jiraKey}: update it for the merge, following this project's Jira rules.`
+      : 'No Jira issue key was found in the PR title or the branch name; ask which issue, if any, to update.',
+    'Also do anything else this session or the project\'s instructions say should happen once this PR merges, then say what you updated.',
   ].join(' ')
 
 async function tellIfMerged($: EngineInterface, before: Pr | null, after: Pr | null) {
@@ -708,7 +709,7 @@ async function tellIfMerged($: EngineInterface, before: Pr | null, after: Pr | n
   const branch = (await $.process.run(['git', 'branch', '--show-current'])).stdout.trim()
   const key = (after.title.match(ISSUE_KEY) ?? branch.match(ISSUE_KEY))?.[0]
   $.ui.toast(`PR #${after.number} merged`)
-  void $.prompt.submit({ text: mergePrompt(after.number, after.title, key) })
+  void $.prompt.submit({ text: mergePrompt(after.number, after.title, key, after.base) })
 }
 
 async function refreshDiff($: EngineInterface, current: Pr | null) {
@@ -720,6 +721,14 @@ async function refreshDiff($: EngineInterface, current: Pr | null) {
 async function refreshAccount($: EngineInterface) {
   const { exitCode, stdout } = await $.process.run(['claude', 'auth', 'status'], { timeoutMs: 15_000 })
   await update($, account, () => (exitCode === 0 ? parseAuthStatus(stdout) : null))
+}
+
+// The PR poll, which is how a merge is seen while the session sits idle. A
+// hot reload cancels the timer without running session.start again, so the
+// band re-arms it whenever it draws.
+let pollTimer: { cancel(): void } | null = null
+function ensurePolling($: EngineInterface) {
+  pollTimer ??= $.clock.every(POLL_MS, () => void refreshAll($))
 }
 
 async function refreshAll($: EngineInterface) {
@@ -992,7 +1001,7 @@ export const register: Register = on => {
       if (r.exitCode === 0) repoTop = r.stdout.trim()
     })
     void refreshAll($)
-    $.clock.every(POLL_MS, () => void refreshAll($))
+    ensurePolling($)
     const stored = await $.store.get('port')
     if (typeof stored === 'number' && parsePort(String(stored)) !== undefined) await update($, port, () => stored)
     if ((await read($, serve)).state !== 'running') void pickFreePort($).catch(() => {})
@@ -1220,7 +1229,9 @@ export const register: Register = on => {
   })
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
-    if (!(await read($, canServe)) || e.props.hasSurvey || (await read($, isHidden))) return next(e)
+    if (!(await read($, canServe))) return next(e)
+    ensurePolling($)
+    if (e.props.hasSurvey || (await read($, isHidden))) return next(e)
 
     const [p, j, s, isServeRepo, at, d, acct, topics] = await Promise.all([
       read($, pr),

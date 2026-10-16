@@ -1,5 +1,17 @@
 # aj-log
 
+## 2026-10-16 — work-band: always tell the agent when the PR merges
+
+- `register.tsx`: a hot reload of the mod cancelled the 2-minute PR poll, and nothing re-armed
+  it, so an idle session never saw its PR merge. The poll is now armed through
+  `ensurePolling`, at session start and on every draw of the band, so it comes back after a
+  reload.
+- `mergePrompt`: names the base branch. Besides updating the Jira issue, it tells the agent to
+  do anything else the session or the project's instructions say should happen once the PR
+  merges, and to say what it updated. Why: the user wants the agent to update whatever it
+  needs to on a merge, not only Jira.
+- 88 tests pass.
+
 ## 2026-10-15 — greenlight says what it will do and which workflows it watches
 
 - `SKILL.md`: new step 0. Before anything else, Claude states the plan (merge, push, rerun a

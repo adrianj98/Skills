@@ -765,8 +765,8 @@ for (const surface of ['terminal', 'desktop'] as const) {
 }
 
 test('the merge prompt names the PR and its Jira issue', () => {
-  expect(mergePrompt(2902, 'feat: AL-4169 x', 'AL-4169')).toBe(
-    'PR #2902 ("feat: AL-4169 x") has just been merged; the work-band mod saw it change from open to merged. Its Jira issue is AL-4169. Update AL-4169 for the merge, following this project\'s Jira rules.',
+  expect(mergePrompt(2902, 'feat: AL-4169 x', 'AL-4169', 'develop')).toBe(
+    'PR #2902 ("feat: AL-4169 x") has just been merged into develop; the work-band mod saw it change from open to merged. Its Jira issue is AL-4169: update it for the merge, following this project\'s Jira rules. Also do anything else this session or the project\'s instructions say should happen once this PR merges, then say what you updated.',
   )
 })
 
