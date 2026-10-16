@@ -24,7 +24,6 @@ import {
   mergePrompt,
   parseMergeFacts,
   fitWidth,
-  firstRowWidth,
   parseDry,
   abbreviateStatus,
   parseJiraStatus,
@@ -376,9 +375,10 @@ for (const surface of ['terminal', 'desktop'] as const) {
       true,
     )
     const ui = await mountBand($, surface)
-    const row = (await ui.findAll({ type: 'Box' }))[1]!.text
+    const rows = await ui.findAll({ type: 'Box' })
+    const row = rows[2]!.text
     expect(row).toContain('PR #2902 open')
-    expect(row).toContain('AL-4169 TODO MATEOAS: route tables, apiPage helper')
+    expect(rows[1]!.text).toContain('AL-4169 TODO MATEOAS: route tables, apiPage helper')
     expect(await ui.find({ type: 'Link' })).toBeUndefined()
     await ui.press({ key: 'jira' })
     expect(opened('https://alertd.atlassian.net/browse/AL-4169')).toBe(true)
@@ -415,24 +415,14 @@ test('a status abbreviates to a short tag', () => {
   expect(abbreviateStatus('  ')).toBe('')
 })
 
-test('the first row is measured as drawn; a title is cut to a width with an ellipsis', () => {
-  const pr = { number: 2902, state: 'open', isDraft: false, passed: 1, failed: 0, pending: 0 } as never
-  expect(firstRowWidth({ pr, diff: null, jira: { key: 'AL-1', title: 'Short' }, serve: '   [ server :1776 ^ ]', plan: 'Max' })).toBe(
-    'PR #2902 open · diff · ✓1 ✗0 …0'.length + 3 + 'AL-1 Short'.length + '   [ server :1776 ^ ]'.length + '   Max'.length,
-  )
-  expect(firstRowWidth({ pr, diff: null, jira: { key: 'AL-1', title: 'Short', status: 'PROG' }, serve: '', plan: undefined })).toBe(
-    firstRowWidth({ pr, diff: null, jira: { key: 'AL-1', title: 'Short' }, serve: '', plan: undefined }) + 'PROG '.length,
-  )
-  expect(firstRowWidth({ pr: null, diff: { added: 4, removed: 2, base: 'develop' }, jira: null, serve: '', plan: undefined })).toBe(
-    'no PR · +4 −2 vs develop   no Jira key'.length,
-  )
+test('a title is cut to a width with an ellipsis', () => {
   expect(fitWidth('abcdef', 6)).toBe('abcdef')
   expect(fitWidth('abcdef', 4)).toBe('abc…')
   expect(fitWidth('abcdef', 1)).toBe('…')
 })
 
 for (const surface of ['terminal', 'desktop'] as const) {
-  test(`${surface}: a title too wide for the row gets a row of its own, cut to the band`, async ($, on) => {
+  test(`${surface}: the Jira issue has the first row, its title cut to the band; the PR the second`, async ($, on) => {
     const title = 'Bedrock Spend: price the models that show as unpriced, including Pegasus video seconds'
     on('tool.list', () => ({ value: [{ name: 'mcp__claude_ai_Atlassian_Rovo__getJiraIssue', description: '', mcp: true }] }) as never)
     on('tool.check', () => ({ decision: 'allow' }) as never)
@@ -442,21 +432,19 @@ for (const surface of ['terminal', 'desktop'] as const) {
         : next(e),
     )
     await startIn($, on, 'git@github.com:alert-d/alertd-core.git', PR_WITH_KEY, mock.clock(on), true)
-    // Wide enough: two rows, the status and title whole on the first.
+    // Wide enough: the status and title whole.
     let ui = await mountBand($, surface, 200)
     let rows = await ui.findAll({ type: 'Box' })
-    expect(rows[1]!.text).toContain(`AL-4169 PROG ${title}`)
-    expect(rows.length).toBe(2)
-    // Too narrow: the issue moves to its own row, cut to 60 cells, and the
-    // first row keeps the PR and the server control.
+    expect(rows[1]!.text).toBe(`AL-4169 PROG ${title}`)
+    expect(rows[2]!.text).toContain('PR #1 open')
+    expect(rows[2]!.text).toContain('[ server :1776 ^ ]')
+    // Narrow: the title is cut to 60 cells; the PR row is untouched.
     ui = await mountBand($, surface, 60)
     rows = await ui.findAll({ type: 'Box' })
-    expect(rows.length).toBe(3)
-    expect(rows[1]!.text).not.toContain('AL-4169')
-    expect(rows[1]!.text).toContain('PR #1 open')
-    expect(rows[1]!.text).toContain('[ server :1776 ^ ]')
-    expect(rows[2]!.text).toBe(`AL-4169 PROG ${title.slice(0, 60 - 'AL-4169 PROG '.length - 1)}…`)
-    expect(rows[2]!.text.length).toBe(60)
+    expect(rows[1]!.text).toBe(`AL-4169 PROG ${title.slice(0, 60 - 'AL-4169 PROG '.length - 1)}…`)
+    expect(rows[1]!.text.length).toBe(60)
+    expect(rows[2]!.text).not.toContain('AL-4169')
+    expect(rows[2]!.text).toContain('[ server :1776 ^ ]')
     await ui.press({ key: 'jira' })
     expect(opened('https://alertd.atlassian.net/browse/AL-4169')).toBe(true)
   })
@@ -1010,7 +998,7 @@ for (const surface of ['terminal', 'desktop'] as const) {
     })
     await startIn($, on, 'git@github.com:alert-d/alertd-core.git', prBody, mock.clock(on), false, new Map(), SHORTSTAT('release/1.4'))
     const band = await mountBand($, surface)
-    const row = (await band.findAll({ type: 'Box' }))[1]!.text
+    const row = (await band.findAll({ type: 'Box' }))[2]!.text
     expect(row).toContain('PR #2902 open · +2450 −271 · ✓0 ✗0 …0')
     await band.press({ key: 'pr' })
     expect(opened('https://github.com/alert-d/alertd-core/pull/2902')).toBe(true)
@@ -1022,7 +1010,7 @@ for (const surface of ['terminal', 'desktop'] as const) {
   test(`${surface}: with no PR the diff is against develop, and says so`, async ($, on) => {
     await startIn($, on, 'git@github.com:alert-d/alertd-core.git', '', mock.clock(on), false, new Map(), SHORTSTAT('develop'))
     const band = await mountBand($, surface)
-    expect((await band.findAll({ type: 'Box' }))[1]!.text).toContain('no PR · +2450 −271 vs develop')
+    expect((await band.findAll({ type: 'Box' }))[2]!.text).toContain('no PR · +2450 −271 vs develop')
   })
 }
 
@@ -1176,28 +1164,21 @@ for (const surface of ['terminal', 'desktop'] as const) {
     on('tool.check', () => ({ decision: 'allow' }) as never)
     await startIn($, on, 'git@github.com:alert-d/alertd-core.git', '', mock.clock(on), true)
     const ui = await mountBand($, surface)
-    const row = async () => (await ui.findAll({ type: 'Box' }))[1]!.text
-    expect(await row()).toContain('no Jira key   [ server :1776 ^ ]')
+    const row = async () => (await ui.findAll({ type: 'Box' }))[2]!.text
+    expect(await row()).toContain('no PR · diff   [ server :1776 ^ ]')
 
     const bad = await $.tool.call({ tool: TOPIC_TOOL, topics: 'x' } as never)
     expect('deny' in bad && bad.deny).toContain('set_topic takes')
-    expect(await row()).toContain('no Jira key   [ server :1776 ^ ]')
+    expect(await row()).toContain('no PR · diff   [ server :1776 ^ ]')
 
     const ok = await $.tool.call({ tool: TOPIC_TOOL, topics: ['work-band topic', ' tests '] } as never)
     expect(ok).toEqual({ result: 'The band shows: work-band topic · tests', text: 'The band shows: work-band topic · tests' })
-    expect(await row()).toContain('no Jira key   work-band topic · tests   [ server :1776 ^ ]')
+    expect(await row()).toContain('no PR · diff   work-band topic · tests   [ server :1776 ^ ]')
 
     await $.tool.call({ tool: TOPIC_TOOL, topics: ['port picking'] } as never)
-    expect(await row()).toContain('no Jira key   port picking   [ server :1776 ^ ]')
+    expect(await row()).toContain('no PR · diff   port picking   [ server :1776 ^ ]')
   })
 }
-
-test('the topic counts toward the first row, so a long one moves Jira to its own row', () => {
-  const pr = { number: 1, state: 'open', isDraft: false, passed: 1, failed: 0, pending: 0, title: 't' }
-  const base = firstRowWidth({ pr, diff: null, jira: { key: 'AL-1', title: 'Short' }, serve: '', plan: undefined })
-  expect(firstRowWidth({ pr, diff: null, jira: { key: 'AL-1', title: 'Short' }, serve: '', plan: undefined, branch: 'main' })).toBe(base + 3 + 'main'.length)
-  expect(firstRowWidth({ pr, diff: null, jira: { key: 'AL-1', title: 'Short' }, serve: '', plan: undefined, topic: 'a · b' })).toBe(base + 3 + 'a · b'.length)
-})
 
 test('ports tried: the remembered one, then 1920-1990 in a random order', () => {
   const all = Array.from({ length: 71 }, (_, i) => 1920 + i)
@@ -1274,7 +1255,7 @@ test('the band ends with the plan alone, not the org', async ($, on) => {
       : undefined,
   )
   const band = await mountBand($, 'terminal')
-  expect((await band.findAll({ type: 'Box' }))[1]!.text).toMatch(/ {3}Team$/)
+  expect((await band.findAll({ type: 'Box' }))[2]!.text).toMatch(/ {3}Team$/)
 })
 
 test('serveTrees: the servers this Claude started and everything under them, no one else\'s', () => {
@@ -1349,5 +1330,6 @@ test('the band starts with the branch', async ($, on) => {
   await clock.advance(1)
   const ui = await mountBand($, 'terminal')
   expect(await ui.find({ type: 'Text', text: 'feature/app-tools-in-configs-yaml   ' })).toBeDefined()
-  expect((await ui.findAll({ type: 'Box' }))[1]!.text).toStartWith('feature/app-tools-in-configs-yaml   no PR')
+  expect((await ui.findAll({ type: 'Box' }))[1]!.text).toBe('feature/app-tools-in-configs-yaml   no Jira key')
+  expect((await ui.findAll({ type: 'Box' }))[2]!.text).toStartWith('no PR')
 })

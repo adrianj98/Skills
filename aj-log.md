@@ -1,5 +1,15 @@
 # aj-log
 
+## 2026-10-16 — work-band: the branch and Jira share the first row
+
+- `register.tsx`: the band is now two rows, plus the task row when the server runs. The first
+  has the branch and the Jira issue (key, status, title). The title is cut to whatever width
+  the branch, key and status leave. The second has the PR, diff, checks, topic, server
+  control and plan. The "move Jira to its own row when too wide" logic and `firstRowWidth` are
+  gone, since Jira always has a row now. Why: the user asked for the branch and Jira on one
+  line.
+- Tests updated for the rows, and the width-measure test removed. 91 pass.
+
 ## 2026-10-16 — work-band shows the branch
 
 - `register.tsx`: a `branch` atom is filled from `git branch --show-current` on each refresh
