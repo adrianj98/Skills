@@ -439,3 +439,9 @@
   document touring a PR's code in reading order, one stop per idea with code, `file:line`, and why;
   it goes to a docs connector/Artifact when available, else an untracked `walkthrough-<PR>.md`.
   Why: asked for a skill that creates a code-walkthrough document for a PR.
+- `plugins/work-band/hooks/register.tsx`: the band now shows the session's model before the
+  subscription plan at the end of the second row (`Opus 5.5 · Max`). `modelLabel` turns the id
+  from `$.session.model()` (`claude-opus-5-5[1m]`) into `Opus 5.5 1M`; it is read on every draw so
+  a `/model` switch shows on the next one. Tests for `modelLabel` and the band's ending; README
+  sentence; installed copy in `~/.claude/mods/work-band` updated.
+  Why: asked for the work band to show the model in use, with the subscription.

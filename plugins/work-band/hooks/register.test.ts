@@ -4,6 +4,7 @@ import { expect, mock, test } from 'claude-code/testing'
 import {
   applyLine,
   parseAuthStatus,
+  modelLabel,
   candidatePorts,
   parseTopics,
   topicText,
@@ -1308,6 +1309,26 @@ test('the band ends with the plan alone, not the org', async ($, on) => {
   )
   const band = await mountBand($, 'terminal')
   expect((await band.findAll({ type: 'Box' }))[2]!.text).toMatch(/ {3}Team$/)
+})
+
+test('modelLabel: a model id as the band names it', () => {
+  expect(modelLabel('claude-opus-5-5')).toBe('Opus 5.5')
+  expect(modelLabel('claude-opus-5-5[1m]')).toBe('Opus 5.5 1M')
+  expect(modelLabel('claude-sonnet-4-5-20250929')).toBe('Sonnet 4.5')
+  expect(modelLabel('claude-fable-5-1')).toBe('Fable 5.1')
+  expect(modelLabel('Opus 5.5')).toBe('Opus 5.5')
+  expect(modelLabel('')).toBe('')
+})
+
+test('the band ends with the model, then the plan', async ($, on) => {
+  on('session.model', () => ({ value: 'claude-opus-5-5' }) as never)
+  await startIn($, on, 'git@github.com:alert-d/alertd-core.git', '', mock.clock(on), false, new Map(), argv =>
+    argv.join(' ') === 'claude auth status'
+      ? JSON.stringify({ loggedIn: true, authMethod: 'claude.ai', orgName: 'AlertD', subscriptionType: 'max' })
+      : undefined,
+  )
+  const band = await mountBand($, 'terminal')
+  expect((await band.findAll({ type: 'Box' }))[2]!.text).toMatch(/ {3}Opus 5\.5 · Max$/)
 })
 
 test('serveTrees: the servers this Claude started and everything under them, no one else\'s', () => {

@@ -156,7 +156,7 @@ claude plugin install walkthrough@adrianj98-skills
 
 A mod, not a skill: a hooks module that draws a band above the prompt in any GitHub repo. It shows
 the checked-out branch, its PR and checks, and the lines added and removed against the PR's base
-(or the repo's default branch). Clicking opens a pane beside the transcript: the checks (with a
+(or the repo's default branch), and at the end the model and subscription plan (`Opus 5.5 · Max`). Clicking opens a pane beside the transcript: the checks (with a
 re-run button), the changed files as a tree, or the dev server's logs. `/wb` hides and shows the
 band. Claude tells the band what it is working on through the mod's `set_topic` tool, drawn in
 cyan; every prompt you send carries a hidden line with that topic, so Claude re-checks it.

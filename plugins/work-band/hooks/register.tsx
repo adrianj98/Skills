@@ -290,6 +290,15 @@ export const parseAuthStatus = (text: string): Account | null => {
   return { plan, org: raw.orgName || undefined, email: raw.email || undefined }
 }
 
+// The session's model as the band names it: `claude-opus-5-5[1m]` → `Opus 5.5 1M`,
+// `claude-sonnet-4-5-20250929` → `Sonnet 4.5`; anything else as given.
+export const modelLabel = (raw: string): string => {
+  const m = /^claude-([a-z]+)-(\d+)(?:-(\d{1,2}))?(?:-\d{8})?(\[1m\])?$/i.exec(raw.trim())
+  if (!m) return raw.trim()
+  const [, family, major, minor, wide] = m
+  return `${family![0]!.toUpperCase()}${family!.slice(1)} ${major}${minor ? `.${minor}` : ''}${wide ? ' 1M' : ''}`
+}
+
 // 1h 02m · 4m 31s · 12s
 export const formatDuration = (ms: number): string => {
   const sec = Math.max(0, Math.round(ms / 1000))
@@ -1586,6 +1595,8 @@ export const register: Register = on => {
     const isServeRepo = isOn && serverKind(cfg) !== 'none'
     const site = jiraSite(cfg)
     const topicLabel = topics.length ? topicText(topics) : undefined
+    // Read on every draw, so a /model switch shows on the next one.
+    const model = modelLabel(await $.session.model().catch(() => ''))
     const branchLabel = head ? fitWidth(head, BRANCH_MAX) : ''
     const { Box, Button, Text } = $.ui.resolve(e)
 
@@ -1726,10 +1737,12 @@ export const register: Register = on => {
           {isServeRepo ? <Button key="menu" plain label="^" onPress={() => openServeMenu($)} /> : null}
           {isServeRepo ? <Text> ]</Text> : null}
           {exitedLabel && isServeRepo ? <Text color="error"> {exitedLabel}</Text> : null}
-          {acct ? (
+          {model || acct ? (
             <Text>
               {'   '}
-              <Text color="magenta">{acct.plan}</Text>
+              {model ? <Text color="magenta">{model}</Text> : null}
+              {model && acct ? <Text dimColor> · </Text> : null}
+              {acct ? <Text color="magenta">{acct.plan}</Text> : null}
             </Text>
           ) : null}
         </Box>
