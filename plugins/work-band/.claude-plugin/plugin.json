@@ -1,1 +1,1 @@
-{ "name": "work-band", "version": "0.1.0", "description": "Band above the prompt: this branch's PR and Jira status, plus a button that starts or restarts t (turbo serve)", "types": "./types/index.d.ts" }
+{"name": "work-band", "version": "0.2.0", "description": "A band above the prompt in any GitHub repo: the branch, the PR and its checks, the changed files, and per repo, set in ~/.claude/work-band.json with /wb settings or /wb setup, the Jira issue and a dev-server button.", "types": "./types/index.d.ts"}

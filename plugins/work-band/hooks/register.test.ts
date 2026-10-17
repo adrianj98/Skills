@@ -54,6 +54,22 @@ const DRY = JSON.stringify({
 const ran: (readonly string[])[] = []
 const opened = (url: string) => ran.some(a => a[0] === 'open' && a[1] === url)
 
+// The settings file the tests' home folder holds: alertd-core's entry, as
+// the person's own ~/.claude/work-band.json has it. A test may replace it
+// before startIn; `files` keeps what the mod writes.
+export const ALERTD_SETTINGS = {
+  'alert-d/alertd-core': {
+    jira: { site: 'alertd.atlassian.net' },
+    server: { kind: 'turbo', portEnv: 'WEB_PORT', ports: [1776, 1791, 1792], env: { ORCHESTRATOR_SINGLETON_GATE: 'false' } },
+  },
+}
+const SETTINGS_PATH = '/home/t/.claude/work-band.json'
+const files = new Map<string, string>()
+let nextSettings: object | undefined
+const useSettings = (all: object) => {
+  nextSettings = all
+}
+
 const registered: string[] = []
 const commands: string[] = []
 const startIn = async ($: Engine, on: On, origin: string, prJson: string | (() => string) = '', clock = mock.clock(on), ownJira = false, store = new Map<string, unknown>(),
@@ -63,7 +79,8 @@ const startIn = async ($: Engine, on: On, origin: string, prJson: string | (() =
   void clock
   on('process.run', (_$, e) => {
     ran.push(e.argv)
-    const out = git?.(e.argv)
+    const given = git?.(e.argv)
+    const out = given !== undefined ? given : e.argv[0] === 'gh' && e.argv[1] === 'repo' && e.argv[2] === 'view' ? 'develop\n' : undefined
     if (out === null) return { value: { exitCode: 1, stdout: '', stderr: 'fatal', isStdoutTruncated: false, isStderrTruncated: false } }
     if (out !== undefined) {
       return { value: { exitCode: 0, stdout: out, stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
@@ -88,6 +105,19 @@ const startIn = async ($: Engine, on: On, origin: string, prJson: string | (() =
     }
   })
   on('ui.log', () => ({ value: undefined }) as never)
+  files.clear()
+  files.set(SETTINGS_PATH, JSON.stringify(nextSettings ?? ALERTD_SETTINGS))
+  nextSettings = undefined
+  on('env.get', (_$, e) => ({ value: e.name === 'HOME' ? '/home/t' : undefined }) as never)
+  on('fs.read', (_$, e) => {
+    const text = files.get(e.path)
+    if (text === undefined) throw new Error(`ENOENT: ${e.path}`)
+    return { value: text } as never
+  })
+  on('fs.write', (_$, e) => {
+    files.set(e.path, e.text)
+    return { value: undefined } as never
+  })
   on('store.get', (_$, e) => ({ value: store.get(e.key) }) as never)
   on('store.set', (_$, e) => {
     store.set(e.key, e.value)
@@ -212,17 +242,39 @@ for (const surface of ['terminal', 'desktop'] as const) {
 }
 
 for (const surface of ['terminal', 'desktop'] as const) {
-  test(`${surface}: outside alertd-core there is no band, no /wb and no set_topic`, async ($, on) => {
+  test(`${surface}: another GitHub repo with no settings: the band, but no Jira and no server`, async ($, on) => {
+    await startIn($, on, 'git@github.com:someone/else.git', '', mock.clock(on), false, new Map(), argv =>
+      argv[0] === 'git' && argv[1] === 'branch' ? 'AL-1-x\n' : undefined,
+    )
+    const ui = await mountBand($, surface)
+    expect(await ui.find({ type: 'Text', text: 'no PR' })).toBeDefined()
+    expect(await ui.find({ key: 'serve' })).toBe(undefined)
+    expect(await ui.find({ key: 'jira' })).toBe(undefined)
+    expect(await ui.find({ type: 'Text', text: /no Jira key/ })).toBe(undefined)
+  })
+
+  test(`${surface}: a remote not on GitHub: no band, no /wb and no set_topic`, async ($, on) => {
     registered.length = 0
     commands.length = 0
     ran.length = 0
-    await startIn($, on, 'git@github.com:someone/else.git')
+    await startIn($, on, 'git@gitlab.com:someone/else.git')
     const ui = await mountBand($, surface)
-    expect(await ui.find({ key: 'serve' })).toBe(undefined)
     expect(await ui.find({ type: 'Text', text: 'no PR' })).toBe(undefined)
     expect(commands).toEqual([])
     expect(registered).toEqual([])
     expect(ran.filter(a => a[0] === 'gh').length).toBe(0)
+  })
+
+  test(`${surface}: a repo whose settings turn the band off: no band, but /wb to turn it on`, async ($, on) => {
+    registered.length = 0
+    commands.length = 0
+    useSettings({ 'someone/else': { enabled: false } })
+    await startIn($, on, 'git@github.com:someone/else.git')
+    const ui = await mountBand($, surface)
+    expect(await ui.find({ type: 'Text', text: 'no PR' })).toBe(undefined)
+    expect(commands).toEqual(['wb'])
+    expect(registered).toEqual([])
+    expect((await $.command.run({ command: 'wb', args: '' } as never)).text).toContain('off for this repo')
   })
 }
 
@@ -838,7 +890,7 @@ for (const surface of ['terminal', 'desktop'] as const) {
     await ui.press({ key: 'menu' })
 
     expect(ports).toEqual(['1776', '1791'])
-    expect(store.get('port')).toBe(1791)
+    expect(store.get('port:alert-d/alertd-core')).toBe(1791)
     expect(await ui.find({ type: 'Text', text: /:1791/ })).toBeDefined()
   })
 }
@@ -849,7 +901,7 @@ test('a remembered port is used from the start of the next session', async ($, o
     ports.push(e.env?.WEB_PORT)
     return { value: { code: 0, signal: null } }
   })
-  await startIn($, on, 'git@github.com:alert-d/alertd-core.git', '', mock.clock(on), false, new Map([['port', 1792]]))
+  await startIn($, on, 'git@github.com:alert-d/alertd-core.git', '', mock.clock(on), false, new Map([['port:alert-d/alertd-core', 1792]]))
   const ui = await mountBand($, 'terminal')
   await ui.press({ key: 'serve' })
   expect(ports).toEqual(['1792'])
@@ -1085,7 +1137,7 @@ for (const surface of ['terminal', 'desktop'] as const) {
   test(`${surface}: the port opens the server in Chrome's existing tab, else plain open`, async ($, on) => {
     const ran: string[][] = []
     let chromeWorks = true
-    const store = new Map<string, unknown>([['port', 1791]])
+    const store = new Map<string, unknown>([['port:alert-d/alertd-core', 1791]])
     await startIn($, on, 'git@github.com:alert-d/alertd-core.git', '', mock.clock(on), false, store, argv => {
       if (argv[0] === 'osascript' || argv[0] === 'open') {
         ran.push([...argv])
@@ -1219,7 +1271,7 @@ test('a taken port at session start moves the server to the first free one, for 
   expect(at).toBeGreaterThanOrEqual(1920)
   expect(at).toBeLessThanOrEqual(1990)
   expect(toasts).toEqual([`Port 1776 is in use; the server will use ${at}`])
-  expect(store.has('port')).toBe(false)
+  expect(store.has('port:alert-d/alertd-core')).toBe(false)
 })
 
 test('a free remembered port is kept, with no notice', async ($, on) => {
@@ -1228,7 +1280,7 @@ test('a free remembered port is kept, with no notice', async ($, on) => {
     toasts.push(e.text)
     return { value: undefined } as never
   })
-  await startIn($, on, 'git@github.com:alert-d/alertd-core.git', '', mock.clock(on), false, new Map([['port', 1791]]))
+  await startIn($, on, 'git@github.com:alert-d/alertd-core.git', '', mock.clock(on), false, new Map([['port:alert-d/alertd-core', 1791]]))
   const band = await mountBand($, 'terminal')
   expect((await band.find({ key: 'port' }))?.text).toBe(':1791')
   expect(toasts).toEqual([])
@@ -1332,4 +1384,137 @@ test('the band starts with the branch', async ($, on) => {
   expect(await ui.find({ type: 'Text', text: 'feature/app-tools-in-configs-yaml   ' })).toBeDefined()
   expect((await ui.findAll({ type: 'Box' }))[1]!.text).toBe('feature/app-tools-in-configs-yaml   no Jira key')
   expect((await ui.findAll({ type: 'Box' }))[2]!.text).toStartWith('no PR')
+})
+
+// Answers each $.ui.ask in turn from `answers`, and keeps the questions.
+const answering = (on: On, answers: string[]) => {
+  const asked: { question: string; options: string[] }[] = []
+  on('tool.call', { tool: 'AskUserQuestion' }, (_$, e) => {
+    const q = e.questions[0]!
+    asked.push({ question: q.question, options: q.options.map(o => o.label) })
+    const answer = answers.shift()
+    if (answer === undefined) throw new Error('dismissed')
+    return { result: { questions: e.questions, answers: { [q.question]: answer } } } as never
+  })
+  return asked
+}
+const savedSettings = () => JSON.parse(files.get(SETTINGS_PATH) ?? '{}') as Record<string, unknown>
+
+test('alertd-core with no Jira site: Jira is never asked, and the band shows none', async ($, on) => {
+  useSettings({ 'alert-d/alertd-core': { server: ALERTD_SETTINGS['alert-d/alertd-core'].server } })
+  const calls: string[] = []
+  on('tool.list', () => {
+    calls.push('list')
+    return { value: [{ name: 'mcp__claude_ai_Atlassian_Rovo__getJiraIssue', description: '', mcp: true }] } as never
+  })
+  on('tool.check', () => ({ decision: 'allow' }) as never)
+  await startIn($, on, 'git@github.com:alert-d/alertd-core.git', PR_WITH_KEY, mock.clock(on), true)
+  const ui = await mountBand($, 'terminal')
+  expect(calls).toEqual([])
+  expect(await ui.find({ key: 'jira' })).toBe(undefined)
+  expect(await ui.find({ key: 'serve' })).toBeDefined()
+})
+
+test('a plain server runs its own command with its port variable, one `server` task', async ($, on) => {
+  useSettings({ 'someone/web': { server: { kind: 'plain', command: ['npm', 'run', 'dev'], ports: [5173] } } })
+  const spawned: (readonly string[])[] = []
+  const envs: (Record<string, string> | undefined)[] = []
+  ran.length = 0
+  on('process.spawn', async function* (_$, e, next) {
+    spawned.push(e.argv)
+    envs.push(e.env as Record<string, string> | undefined)
+    yield { stream: 'stdout' as const, text: 'VITE ready\n' }
+    await new Promise<void>(resolve => next.signal.addEventListener('abort', () => resolve()))
+    return { value: { code: null, signal: 'SIGTERM' } }
+  })
+  await startIn($, on, 'git@github.com:someone/web.git')
+  const ui = await mountBand($, 'terminal')
+  expect((await ui.find({ key: 'port' }))?.text).toBe(':5173')
+  await ui.press({ key: 'serve' })
+  expect(spawned).toEqual([['npm', 'run', 'dev']])
+  expect(envs[0]).toEqual({ FORCE_COLOR: '0', PORT: '5173' })
+  expect(await ui.find({ key: 'task-server' })).toBeDefined()
+  expect(ran.some(a => a.includes('--dry=json'))).toBe(false)
+})
+
+for (const surface of ['terminal', 'desktop'] as const) {
+  test(`${surface}: the settings pane lists this repo's settings, and a click changes one and saves it`, async ($, on) => {
+    useSettings({ 'someone/else': {}, 'other/repo': { enabled: false } })
+    const asked = answering(on, ['acme.atlassian.net'])
+    const opened: string[] = []
+    on('ui.open', (_$, e) => {
+      opened.push(e.id)
+      return { value: { isPlaced: true } } as never
+    })
+    await startIn($, on, 'git@github.com:someone/else.git')
+    expect((await $.command.run({ command: 'wb', args: 'settings' } as never)).text).toBe('Work band settings opened.')
+    expect(opened).toEqual(['wb-settings'])
+    const pane = await $.ui.mount({
+      plugin: 'work-band',
+      surface,
+      component: 'Pane',
+      requestId: 'wb-settings',
+      props: { title: 'settings', isFocused: false, bodyColumns: 100, placement: 'dock', scroll: { offset: 0, bodyRows: 20 } } as never,
+    })
+    expect((await pane.find({ key: 'set-jira.site' }))?.text).toContain('none (Jira off)')
+    await pane.press({ key: 'set-jira.site' })
+    expect(asked[0]!.options).toEqual(['None', 'Keep as is'])
+    expect(savedSettings()).toEqual({ 'someone/else': { jira: { site: 'acme.atlassian.net' } }, 'other/repo': { enabled: false } })
+    expect((await pane.find({ key: 'set-jira.site' }))?.text).toContain('acme.atlassian.net')
+  })
+}
+
+test('/wb setup asks each setting in turn, offers the servers it finds, and saves once', async ($, on) => {
+  useSettings({})
+  const asked = answering(on, ['On', 'acme.atlassian.net', 'Any', 'npm run dev', 'PORT', '5173, 5174', 'None'])
+  const clock = mock.clock(on)
+  await startIn($, on, 'git@github.com:someone/web.git', '', clock, false, new Map(), argv =>
+    argv[0] === 'git' && argv.includes('--show-toplevel') ? '/repo\n' : undefined,
+  )
+  files.set('/repo/package.json', '{"scripts":{"dev":"vite"}}')
+  await $.command.run({ command: 'wb', args: 'setup' } as never)
+  await clock.advance(1)
+  expect(asked.map(a => a.question.split('?')[0])).toEqual([
+    'Show the work band in this repo',
+    'Which Jira site does this repo use',
+    'Which Jira projects count',
+    'Which dev server should the band run',
+    'Which environment variable does the server read its port from',
+    'Which ports may the server use, first choice first',
+    'Extra environment for the server',
+  ])
+  expect(asked[3]!.options).toEqual(['None', 'npm run dev'])
+  expect(savedSettings()).toEqual({
+    'someone/web': {
+      jira: { site: 'acme.atlassian.net' },
+      server: { kind: 'plain', command: ['npm', 'run', 'dev'], portEnv: 'PORT', ports: [5173, 5174] },
+    },
+  })
+})
+
+test('/wb setup stops unsaved when a question is dismissed, and skips the server questions with no server', async ($, on) => {
+  useSettings({})
+  const asked = answering(on, ['On', 'None', 'None'])
+  const clock = mock.clock(on)
+  await startIn($, on, 'git@github.com:someone/lib.git', '', clock)
+  await $.command.run({ command: 'wb', args: 'setup' } as never)
+  await clock.advance(1)
+  expect(asked.length).toBe(3)
+  expect(savedSettings()).toEqual({ 'someone/lib': { server: { kind: 'none' } } })
+})
+
+test('/wb setup dismissed partway saves nothing', async ($, on) => {
+  useSettings({ 'someone/lib': { jira: { site: 'old.atlassian.net' } } })
+  const toasts: string[] = []
+  on('ui.toast', (_$, e) => {
+    toasts.push(e.text)
+    return { value: undefined } as never
+  })
+  answering(on, ['On'])
+  const clock = mock.clock(on)
+  await startIn($, on, 'git@github.com:someone/lib.git', '', clock)
+  await $.command.run({ command: 'wb', args: 'setup' } as never)
+  await clock.advance(1)
+  expect(savedSettings()).toEqual({ 'someone/lib': { jira: { site: 'old.atlassian.net' } } })
+  expect(toasts).toContain('Work band setup stopped; nothing was saved')
 })

@@ -1,5 +1,40 @@
 # aj-log
 
+## 2026-10-17 — work-band works in any GitHub repo, with per-repo settings
+
+- `hooks/settings.ts` (new, pure): the settings file `~/.claude/work-band.json`, keyed by
+  `owner/repo`. It covers parsing the remote into `owner/repo`; Jira (`jiraSite`, `issueKey`
+  with `keyPattern` and `projects`); the server (`serverKind` turbo, plain or none,
+  `serverArgv`, `planArgv`, `serverEnv` with `portEnv`, `ports`, extra `env`, `serverMatch`
+  for finding stray servers); and `detectServers` from `turbo.json` and `package.json`.
+- `register.tsx`:
+  - The band runs in any GitHub repo whose settings do not say `enabled: false`; no repo name
+    is in the code.
+  - Jira runs only when `jira.site` is set: no Jira calls and no Jira on the band otherwise.
+    The merge notice says nothing of Jira then.
+  - The server button shows only when a server is set. Its command, port variable, ports and
+    env come from the settings. Turbo keeps its task row and plan; a plain server shows one
+    `server` task whose lines are its logs.
+  - The base branch with no PR comes from `gh repo view`, not `develop`. The remembered port
+    is kept per repo (`port:<owner/repo>` in `$.store`).
+- New commands:
+  - `/wb settings` opens a pane listing this repo's settings; clicking one asks for a new
+    value, through options or free text, and saves it.
+  - `/wb setup` is a wizard: each setting in turn, the server's only when there is one, saved
+    once at the end; dismissing it saves nothing.
+  - `/wb` is registered in any GitHub repo, the band off included, so the settings can turn it
+    back on.
+- Wrote alertd-core's settings to `~/.claude/work-band.json`: Jira site, turbo serve,
+  `WEB_PORT`, ports 1776/1791/1792 and `ORCHESTRATOR_SINGLETON_GATE=false`.
+- Tests: the existing tests use that file through mocked `fs` and `env`. New tests cover
+  another GitHub repo (band, no Jira, no server), a non-GitHub remote (nothing), a disabled
+  repo (no band, `/wb` still there), Jira with no site (never called), a plain server (its
+  command and `PORT`, a `server` task, no plan), the settings pane click-and-save, the wizard
+  (questions in order, detected servers offered, saved once), and the wizard dismissed
+  (nothing saved). Also `settings.test.ts` for the pure helpers. 111 pass.
+- Version 0.2.0. Why: the user asked for the band to work outside alertd-core, Jira only
+  with a declared site, alertd-core's settings created, and a settings UI and wizard.
+
 ## 2026-10-16 — work-band: the branch and Jira share the first row
 
 - `register.tsx`: the band is now two rows, plus the task row when the server runs. The first

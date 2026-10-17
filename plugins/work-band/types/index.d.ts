@@ -44,6 +44,14 @@ export type Serve = {
   blink?: boolean
 }
 
+export type ServerKind = 'turbo' | 'plain' | 'none'
+// One repo's entry in ~/.claude/work-band.json; every field optional.
+export type RepoSettings = {
+  enabled?: boolean
+  jira?: { site?: string; keyPattern?: string; projects?: string[] }
+  server?: { kind?: ServerKind; command?: string[]; portEnv?: string; ports?: number[]; env?: Record<string, string> }
+}
+
 declare module 'claude-code' {
   interface PluginState {
     'work-band': { pr: Pr | null; jira: Jira | null; serve: Serve; canServe: boolean; isHidden: boolean; logView: { task: string; tick: number }; mergedTold: number[]
@@ -60,6 +68,12 @@ declare module 'claude-code' {
       topic: string[]
       // the checked-out branch; '' when HEAD is detached
       branch: string
+      // `owner/repo` of the origin remote, '' until known or off GitHub
+      repo: string
+      // this repo's entry in ~/.claude/work-band.json
+      settings: RepoSettings
+      // the repo's default branch, from gh; the diff's base with no PR
+      defaultBranch: string
     }
   }
 }

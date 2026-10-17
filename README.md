@@ -139,16 +139,20 @@ claude plugin install greenlight@adrianj98-skills
 
 [Full README →](plugins/greenlight/README.md)
 
-### [`work-band`](plugins/work-band) · v0.1.0
+### [`work-band`](plugins/work-band) · v0.2.0
 
-A mod, not a skill: a hooks module that draws a band above the prompt. It shows the checked-out
-branch's PR and its checks, the Jira issue the branch names and its status, and the lines added
-and removed against the PR's base. Clicking opens a pane beside the transcript: the checks (with
-a re-run button), the changed files as a tree, or the dev server's logs. In alertd-core a button
-starts or restarts `turbo run serve` and remembers the port. `/wb` hides and shows the band.
-Claude tells the band what it is working on through the mod's `set_topic` tool, and the band draws
-those labels in cyan after the Jira issue. Every prompt you send carries a hidden line with the
-topic the band shows, so Claude re-checks it each time and calls `set_topic` when the work moved.
+A mod, not a skill: a hooks module that draws a band above the prompt in any GitHub repo. It shows
+the checked-out branch, its PR and checks, and the lines added and removed against the PR's base
+(or the repo's default branch). Clicking opens a pane beside the transcript: the checks (with a
+re-run button), the changed files as a tree, or the dev server's logs. `/wb` hides and shows the
+band. Claude tells the band what it is working on through the mod's `set_topic` tool, drawn in
+cyan; every prompt you send carries a hidden line with that topic, so Claude re-checks it.
+
+Per repo, set in `~/.claude/work-band.json` (nothing is written to the repo), it also shows the
+Jira issue the branch names, only once you set the Jira site, and a button that starts or restarts
+the dev server: a turbo `serve` task or any command, with its port variable, ports and extra env.
+`/wb settings` lists this repo's settings in a pane, where a click changes one; `/wb setup` asks
+each in turn and offers the servers it finds in `turbo.json` and `package.json`.
 
 ```bash
 claude plugin install work-band@adrianj98-skills

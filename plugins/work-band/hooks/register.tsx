@@ -1,7 +1,27 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
-import type { Account, Check, CheckState, DiffStat, FilesMode, Jira, Pr, Serve, Task } from '../types'
+import type { Account, Check, CheckState, DiffStat, FilesMode, Jira, Pr, RepoSettings, Serve, Task } from '../types'
+import {
+  SETTINGS_FILE,
+  describe,
+  detectServers,
+  formatSettingsFile,
+  isEnabled,
+  issueKey,
+  jiraSite,
+  parseEnv,
+  parsePorts,
+  parseSettingsFile,
+  planArgv,
+  portEnv,
+  ports,
+  repoOf,
+  serverArgv,
+  serverEnv,
+  serverKind,
+  serverMatch,
+} from './settings'
 import { ancestorsOf, buildRows, marksOf, parseNameStatus, parseStatus, relativeTo } from './tree'
 import type { Change } from './tree'
 
@@ -10,10 +30,14 @@ const jira = atom({ plugin: 'work-band', key: 'jira' } as const, null)
 const serve = atom({ plugin: 'work-band', key: 'serve' } as const, { state: 'stopped', tasks: [] })
 const canServe = atom({ plugin: 'work-band', key: 'canServe' } as const, false)
 const isHidden = atom({ plugin: 'work-band', key: 'isHidden' } as const, false)
-// The port `t` serves on (WEB_PORT); remembered across sessions in $.store.
-const DEFAULT_PORT = 1776
-const PORT_CHOICES = ['1776', '1791', '1792']
-const port = atom({ plugin: 'work-band', key: 'port' } as const, DEFAULT_PORT)
+// The port the server runs on: the repo's first configured port, or the one
+// last chosen for this repo (remembered across sessions in $.store).
+const port = atom({ plugin: 'work-band', key: 'port' } as const, 3000)
+// `owner/repo`, this repo's settings and its default branch.
+const repo = atom({ plugin: 'work-band', key: 'repo' } as const, '')
+const settings = atom({ plugin: 'work-band', key: 'settings' } as const, {} as RepoSettings)
+const defaultBranch = atom({ plugin: 'work-band', key: 'defaultBranch' } as const, '')
+const portKey = (r: string) => `port:${r}`
 // What Claude says it is working on now: one to three short labels it sets
 // through the set_topic tool; empty until it does.
 const topic = atom({ plugin: 'work-band', key: 'topic' } as const, [] as string[])
@@ -51,12 +75,9 @@ const logView = atom({ plugin: 'work-band', key: 'logView' } as const, { task: '
 
 // `t` is the shell alias `npx turbo run serve --ui=tui`. The TUI needs a
 // terminal, which a spawned child has none of, so it streams instead.
-// The band is for alertd-core only: in any other repo the mod registers
-// nothing and draws nothing. Whether this is that repo is kept in `canServe`,
-// state that outlives a hot reload of this module.
-const SERVE_REPO = /[:/]alert-d\/alertd-core(\.git)?$/
-const SERVE_ARGV = ['npx', 'turbo', 'run', 'serve', '--ui=stream']
-const DRY_ARGV = ['npx', 'turbo', 'run', 'serve', '--dry=json']
+// The band runs in any GitHub repo whose settings do not turn it off; in any
+// other folder the mod registers nothing and draws nothing. Whether it is on
+// is kept in `canServe`, state that outlives a hot reload of this module.
 // Whichever Jira MCP server is connected: claude.ai's "Atlassian Rovo", its
 // older "Atlassian", a local `atlassian` server. Every one serves getJiraIssue.
 export const pickJiraTool = (names: readonly string[], op = 'getJiraIssue'): string | undefined =>
@@ -152,14 +173,12 @@ export const abbreviateStatus = (name: string): string => {
   if (words.length > 1) return words.map(w => w.charAt(0)).join('').toUpperCase()
   return words[0]!.slice(0, 4).toUpperCase()
 }
-const JIRA_SITE = 'alertd.atlassian.net'
 
-export const jiraUrl = (key: string) => `https://${JIRA_SITE}/browse/${key}`
+export const jiraUrl = (site: string, key: string) => `https://${site}/browse/${key}`
 const POLL_MS = 120_000
 const MIN_PR_GAP_MS = 30_000
 
 const ANSI = /\u001b\[[0-9;?]*[ -/]*[@-~]/g
-const ISSUE_KEY = /\b[A-Z][A-Z0-9]+-\d+\b/
 
 // One entry of `gh pr view --json statusCheckRollup`: a CheckRun (name,
 // status, conclusion, detailsUrl) or a StatusContext (context, state, targetUrl).
@@ -391,6 +410,8 @@ const tasksOf = (s: Serve): readonly Task[] => s.tasks ?? []
 // Each task's recent output, for the logs pane. Kept in the module, not in
 // $.state: it changes on every line and only the pane reads it.
 const LOGS_PANE = 'server-logs'
+// The one task a plain (not turbo) server shows, its lines its logs.
+const PLAIN_TASK = 'server'
 const LOG_LINES = 500
 const LOG_REDRAW_MS = 250
 const logs = new Map<string, string[]>()
@@ -403,10 +424,11 @@ export const keepLines = (kept: readonly string[], lines: readonly string[], max
 export const withoutPrefix = (line: string): string => line.replace(ANSI, '').replace(OUTPUT, '')
 
 async function recordLogs($: EngineInterface, lines: readonly string[]) {
+  const isPlain = serverKind(await read($, settings)) === 'plain'
   const byTask = new Map<string, string[]>()
   for (const line of lines) {
-    const task = taskOfLine(line)
-    if (task) byTask.set(task, [...(byTask.get(task) ?? []), withoutPrefix(line)])
+    const task = isPlain ? PLAIN_TASK : taskOfLine(line)
+    if (task) byTask.set(task, [...(byTask.get(task) ?? []), isPlain ? line : withoutPrefix(line)])
   }
   for (const [task, added] of byTask) logs.set(task, keepLines(logs.get(task) ?? [], added, LOG_LINES))
 
@@ -444,7 +466,7 @@ async function refreshFiles($: EngineInterface) {
   const top = await $.process.run(['git', 'rev-parse', '--show-toplevel'])
   if (top.exitCode !== 0) return
   repoTop = top.stdout.trim()
-  const base = (await read($, pr))?.base ?? 'develop'
+  const base = (await read($, pr))?.base ?? ((await read($, defaultBranch)) || 'main')
   const [ls, status, diff] = await Promise.all([
     $.process.run(['git', '-C', repoTop, 'ls-files']),
     $.process.run(['git', '-C', repoTop, 'status', '--porcelain=v1', '-uall']),
@@ -595,9 +617,16 @@ async function refreshPr($: EngineInterface): Promise<Pr | null> {
   return next
 }
 
+// Jira runs only where the repo's settings name its site.
 async function refreshJira($: EngineInterface, current: Pr | null) {
+  const cfg = await read($, settings)
+  const site = jiraSite(cfg)
+  if (!site) {
+    await update($, jira, () => null)
+    return
+  }
   const branch = (await $.process.run(['git', 'branch', '--show-current'])).stdout.trim()
-  const key = (current?.title.match(ISSUE_KEY) ?? branch.match(ISSUE_KEY))?.[0]
+  const key = issueKey(cfg, current?.title ?? '', branch)
   if (!key) {
     await update($, jira, () => null)
     return
@@ -607,7 +636,7 @@ async function refreshJira($: EngineInterface, current: Pr | null) {
     await update($, jira, (): Jira => ({ key, error: 'no Jira MCP connected' }))
     return
   }
-  const input = { tool, cloudId: JIRA_SITE, issueIdOrKey: key, fields: ['summary', 'status'] }
+  const input = { tool, cloudId: site, issueIdOrKey: key, fields: ['summary', 'status'] }
   // A refresh every two minutes must never open a permission dialog.
   const { decision } = await $.tool.check({ tool, input })
   if (decision !== 'allow') {
@@ -626,7 +655,8 @@ async function refreshJira($: EngineInterface, current: Pr | null) {
 // applied, the band refreshed. A click may open the tools' permission dialog.
 async function changeJiraStatus($: EngineInterface) {
   const j = await read($, jira)
-  if (!j || !('title' in j)) return
+  const site = jiraSite(await read($, settings))
+  if (!j || !('title' in j) || !site) return
   const names = (await $.tool.list()).map(t => t.name)
   const list = pickJiraTool(names, 'getTransitionsForJiraIssue')
   const move = pickJiraTool(names, 'transitionJiraIssue')
@@ -634,7 +664,7 @@ async function changeJiraStatus($: EngineInterface) {
     $.ui.toast('The Jira MCP cannot change statuses')
     return
   }
-  const got = await $.tool.call({ tool: list, cloudId: JIRA_SITE, issueIdOrKey: j.key } as never)
+  const got = await $.tool.call({ tool: list, cloudId: site, issueIdOrKey: j.key } as never)
   if ('deny' in got) {
     $.ui.toast(`Could not list ${j.key}'s statuses: ${got.deny}`)
     return
@@ -664,7 +694,7 @@ async function changeJiraStatus($: EngineInterface) {
     $.ui.toast(`"${choice}" is not a status ${j.key} can move to`)
     return
   }
-  const done = await $.tool.call({ tool: move, cloudId: JIRA_SITE, issueIdOrKey: j.key, transition: { id: picked.id } } as never)
+  const done = await $.tool.call({ tool: move, cloudId: site, issueIdOrKey: j.key, transition: { id: picked.id } } as never)
   if ('deny' in done || done.isError) {
     $.ui.toast(`${j.key} was not moved: ${('deny' in done ? done.deny : done.text) ?? ''}`.trim())
     return
@@ -674,15 +704,55 @@ async function changeJiraStatus($: EngineInterface) {
 }
 
 // A check that could not run (git failed) leaves the flag as it was, so it
-// never turns off a band that is on; only a remote that is not alertd-core
-// turns it off.
+// never turns off a band that is on; only a remote that is not on GitHub, or
+// settings that turn the band off, turn it off.
 async function checkRepo($: EngineInterface): Promise<boolean> {
   const { exitCode, stdout } = await $.process.run(['git', 'remote', 'get-url', 'origin'])
   if (exitCode !== 0) return read($, canServe)
   answered = true
-  const ok = SERVE_REPO.test(stdout.trim())
+  const name = repoOf(stdout) ?? ''
+  await update($, repo, () => name)
+  const cfg = name ? await loadSettings($, name) : {}
+  const ok = name !== '' && isEnabled(cfg)
   await update($, canServe, () => ok)
   return ok
+}
+
+// ~/.claude/work-band.json (or under CLAUDE_CONFIG_DIR).
+async function settingsPath($: EngineInterface): Promise<string | undefined> {
+  const dir = (await $.env.get('CLAUDE_CONFIG_DIR')) ?? ((await $.env.get('HOME')) ? `${await $.env.get('HOME')}/.claude` : undefined)
+  return dir ? `${dir}/${SETTINGS_FILE}` : undefined
+}
+
+async function readSettingsFile($: EngineInterface): Promise<Record<string, RepoSettings>> {
+  const path = await settingsPath($)
+  if (!path) return {}
+  const text = await $.fs.read(path).catch(() => '')
+  return parseSettingsFile(typeof text === 'string' ? text : '')
+}
+
+async function loadSettings($: EngineInterface, name: string): Promise<RepoSettings> {
+  const cfg = (await readSettingsFile($))[name] ?? {}
+  await update($, settings, () => cfg)
+  return cfg
+}
+
+// Writes this repo's entry and applies it at once.
+async function saveSettings($: EngineInterface, cfg: RepoSettings) {
+  const name = await read($, repo)
+  const path = await settingsPath($)
+  if (!name || !path) {
+    $.ui.toast('No GitHub repo here, so there is nothing to save settings for')
+    return
+  }
+  const all = await readSettingsFile($)
+  all[name] = cfg
+  await $.fs.write(path, formatSettingsFile(all))
+  const wasOn = await read($, canServe)
+  await update($, settings, () => cfg)
+  await update($, canServe, () => isEnabled(cfg))
+  if (isEnabled(cfg) && !wasOn) await activate($)
+  void refreshAll($)
 }
 
 // Whether the band is on in this session. Once git has named the remote,
@@ -719,11 +789,12 @@ async function isOn($: EngineInterface): Promise<boolean> {
 // merged), never of a PR that was already merged when the session started.
 // It is told what happened, not what to do about it.
 export type MergeFacts = { by?: string; at?: string; commit?: string }
-export const mergePrompt = (pr: { number: number; title: string; base?: string; url?: string }, jiraKey: string | undefined, facts: MergeFacts = {}): string =>
+// `jiraKey` null: Jira is off for this repo, so nothing is said of it.
+export const mergePrompt = (pr: { number: number; title: string; base?: string; url?: string }, jiraKey: string | null | undefined, facts: MergeFacts = {}): string =>
   [
     `PR #${pr.number} ("${pr.title}") was merged${pr.base ? ` into ${pr.base}` : ''}${facts.by ? ` by ${facts.by}` : ''}${facts.at ? ` at ${facts.at}` : ''}${facts.commit ? `, merge commit ${facts.commit.slice(0, 7)}` : ''}.`,
     pr.url ?? '',
-    jiraKey ? `Jira issue: ${jiraKey}.` : 'No Jira issue key in the PR title or the branch name.',
+    jiraKey === null ? '' : jiraKey ? `Jira issue: ${jiraKey}.` : 'No Jira issue key in the PR title or the branch name.',
   ]
     .filter(Boolean)
     .join(' ')
@@ -745,7 +816,8 @@ async function tellIfMerged($: EngineInterface, before: Pr | null, after: Pr | n
   await update($, mergedTold, told => (told.includes(after.number) ? told : ((isNew = true), [...told, after.number])))
   if (!isNew) return
   const branch = (await $.process.run(['git', 'branch', '--show-current'])).stdout.trim()
-  const key = (after.title.match(ISSUE_KEY) ?? branch.match(ISSUE_KEY))?.[0]
+  const cfg = await read($, settings)
+  const key = jiraSite(cfg) ? (issueKey(cfg, after.title, branch) ?? undefined) : null
   $.ui.toast(`PR #${after.number} merged`)
   const got = await $.process.run(['gh', 'pr', 'view', String(after.number), '--json', 'mergedBy,mergedAt,mergeCommit'])
   const facts = got.exitCode === 0 ? parseMergeFacts(got.stdout) : {}
@@ -753,7 +825,7 @@ async function tellIfMerged($: EngineInterface, before: Pr | null, after: Pr | n
 }
 
 async function refreshDiff($: EngineInterface, current: Pr | null) {
-  const base = current?.base ?? 'develop'
+  const base = current?.base ?? ((await read($, defaultBranch)) || 'main')
   const { exitCode, stdout } = await $.process.run(['git', 'diff', '--shortstat', `origin/${base}...HEAD`])
   await update($, diffStat, (): DiffStat | null => (exitCode === 0 ? { ...parseShortstat(stdout), base } : null))
 }
@@ -816,15 +888,16 @@ function watchUp($: EngineInterface, mine: number) {
   upTimer = timer
 }
 
-// The pids of every `turbo run serve` this Claude process started, and of
-// everything under them. `ps` rows are `pid ppid command`.
-export const serveTrees = (ps: string, me: number): number[] => {
+// The pids of every server this Claude process started (a process whose
+// command holds `match`, such as `turbo run serve`), and of everything under
+// them. `ps` rows are `pid ppid command`.
+export const serveTrees = (ps: string, me: number, match = 'turbo run serve'): number[] => {
   const rows = ps
     .split('\n')
     .map(l => /^\s*(\d+)\s+(\d+)\s+(.*)$/.exec(l))
     .filter((m): m is RegExpExecArray => m !== null)
     .map(m => ({ pid: Number(m[1]), ppid: Number(m[2]), command: m[3]! }))
-  const out = rows.filter(r => r.ppid === me && r.command.includes('turbo run serve')).map(r => r.pid)
+  const out = match ? rows.filter(r => r.ppid === me && r.command.includes(match)).map(r => r.pid) : []
   for (let i = 0; i < out.length; i++) for (const r of rows) if (r.ppid === out[i] && !out.includes(r.pid)) out.push(r.pid)
   return out
 }
@@ -836,7 +909,9 @@ export const serveTrees = (ps: string, me: number): number[] => {
 async function killServers($: EngineInterface) {
   const me = Number((await $.process.run(['sh', '-c', 'echo $PPID'])).stdout.trim())
   if (!me) return
-  const pids = serveTrees((await $.process.run(['ps', '-axo', 'pid=,ppid=,command='])).stdout, me)
+  const match = serverMatch(await read($, settings))
+  if (!match) return
+  const pids = serveTrees((await $.process.run(['ps', '-axo', 'pid=,ppid=,command='])).stdout, me, match)
   if (pids.length) await $.process.run(['kill', '-TERM', ...pids.map(String)])
 }
 
@@ -917,7 +992,7 @@ async function choosePort($: EngineInterface) {
   try {
     answer = await $.ui.ask(`Which port should the server use? It is on ${current} now.`, {
       header: 'port',
-      options: PORT_CHOICES,
+      options: ports(await read($, settings)).slice(0, 4).map(String),
     })
   } catch {
     return // dismissed
@@ -928,7 +1003,7 @@ async function choosePort($: EngineInterface) {
     return
   }
   await update($, port, () => chosen)
-  await $.store.set('port', chosen)
+  await $.store.set(portKey(await read($, repo)), chosen)
   if ((await read($, serve)).state === 'running') await restartServe($)
 }
 
@@ -955,8 +1030,10 @@ async function openServeMenu($: EngineInterface) {
 }
 
 async function loadPlan($: EngineInterface, mine: number) {
+  const dry = planArgv(await read($, settings))
+  if (!dry) return
   if (!plan) {
-    const { exitCode, stdout } = await $.process.run(DRY_ARGV, { timeoutMs: 120_000 })
+    const { exitCode, stdout } = await $.process.run(dry, { timeoutMs: 120_000 })
     if (exitCode !== 0) return
     plan = parseDry(stdout)
   }
@@ -973,13 +1050,16 @@ async function restartServe($: EngineInterface) {
   }
   await killServers($).catch(() => {})
   logs.clear()
-  // ORCHESTRATOR_SINGLETON_GATE=false: skip the Postgres singleton lock, so
-  // this server boots beside another worktree's instead of parking behind it
-  // (src/server/sessions/bin/orchestratorSingleton.ts; local development only).
-  const env = { FORCE_COLOR: '0', WEB_PORT: String(await read($, port)), ORCHESTRATOR_SINGLETON_GATE: 'false' }
-  const stream = $.process.spawn({ argv: SERVE_ARGV, env })
+  // The command, its port variable and any extra env come from the repo's
+  // settings (alertd-core's sets ORCHESTRATOR_SINGLETON_GATE=false there).
+  const cfg = await read($, settings)
+  const argv = serverArgv(cfg)
+  if (!argv.length) return
+  const stream = $.process.spawn({ argv, env: serverEnv(cfg, await read($, port)) })
   child = stream
-  await update($, serve, (): Serve => ({ state: 'running', tasks: plan ?? [] }))
+  // A plain server is one task, `server`, whose lines are its logs.
+  const first: readonly Task[] = serverKind(cfg) === 'plain' ? [{ name: PLAIN_TASK, state: 'running', persistent: true, deps: [] }] : (plan ?? [])
+  await update($, serve, (): Serve => ({ state: 'running', tasks: first }))
   watchUp($, mine)
   void loadPlan($, mine).catch(() => {})
 
@@ -1020,10 +1100,151 @@ async function restartServe($: EngineInterface) {
   })
 }
 
-// What the session does once it is in alertd-core: the /wb command, the
+// ---------- settings: the pane, one question per setting, the wizard ----------
+const SETTINGS_PANE = 'wb-settings'
+const SETTING_KEYS = ['enabled', 'jira.site', 'jira.projects', 'server.kind', 'server.portEnv', 'server.ports', 'server.env'] as const
+type SettingKey = (typeof SETTING_KEYS)[number]
+
+const KEEP = 'Keep as is'
+const copy = (cfg: RepoSettings): RepoSettings => JSON.parse(JSON.stringify(cfg)) as RepoSettings
+
+// The servers the repo looks like it has, from its turbo.json and package.json.
+async function detectedServers($: EngineInterface) {
+  const top = repoTop || '.'
+  const [turbo, pkg] = await Promise.all([
+    $.fs.read(`${top}/turbo.json`).catch(() => undefined),
+    $.fs.read(`${top}/package.json`).catch(() => undefined),
+  ])
+  return detectServers(typeof turbo === 'string' ? turbo : undefined, typeof pkg === 'string' ? pkg : undefined)
+}
+
+// Asks for one setting and returns the settings with it changed; undefined
+// when the question was dismissed or the answer did not parse (a toast says
+// why). Each question takes free text through the dialog's Other.
+async function askSetting($: EngineInterface, key: SettingKey, cfg: RepoSettings): Promise<RepoSettings | undefined> {
+  const next = copy(cfg)
+  // The dialog pads one option with Yes/No, so a lone option gets Keep as is.
+  const ask = (question: string, header: string, options: string[]) => {
+    const list = [...new Set(options.filter(Boolean))].slice(0, 4)
+    return $.ui.ask(question, { header, options: list.length < 2 ? [...list, KEEP] : list }).catch(() => undefined)
+  }
+  if (key === 'enabled') {
+    const a = await ask('Show the work band in this repo?', 'band', ['On', 'Off'])
+    if (a === undefined) return undefined
+    if (a === KEEP) return next
+    if (a === 'Off') next.enabled = false
+    else delete next.enabled
+    return next
+  }
+  if (key === 'jira.site') {
+    const current = jiraSite(cfg)
+    const a = await ask('Which Jira site does this repo use? Type it under Other (yourco.atlassian.net), or None to turn Jira off.', 'Jira', ['None', ...(current ? [current] : [])])
+    if (a === undefined) return undefined
+    if (a === KEEP) return next
+    const site = a.trim().replace(/^https?:\/\//, '').replace(/\/.*$/, '')
+    if (a === 'None' || !site) {
+      if (next.jira) delete next.jira.site
+    } else next.jira = { ...next.jira, site }
+    return next
+  }
+  if (key === 'jira.projects') {
+    const current = cfg.jira?.projects?.join(', ')
+    const a = await ask('Which Jira projects count? Type their keys under Other (AL, OPS), or Any.', 'projects', ['Any', ...(current ? [current] : [])])
+    if (a === undefined) return undefined
+    if (a === KEEP) return next
+    const list = a === 'Any' ? [] : a.split(/[\s,]+/).map(k => k.trim().toUpperCase()).filter(Boolean)
+    next.jira = { ...next.jira, projects: list.length ? list : undefined }
+    if (!list.length) delete next.jira.projects
+    return next
+  }
+  if (key === 'server.kind') {
+    const found = await detectedServers($)
+    const a = await ask('Which dev server should the band run? Or type a command under Other.', 'server', ['None', ...found.map(f => f.label)])
+    if (a === undefined) return undefined
+    if (a === KEEP) return next
+    if (a === 'None') {
+      next.server = { ...next.server, kind: 'none' }
+      return next
+    }
+    const hit = found.find(f => f.label === a)
+    const command = hit ? hit.command : a.trim().split(/\s+/).filter(Boolean)
+    if (!command.length) return undefined
+    next.server = { ...next.server, kind: hit ? hit.kind : command.includes('turbo') ? 'turbo' : 'plain', command }
+    return next
+  }
+  if (key === 'server.portEnv') {
+    const a = await ask('Which environment variable does the server read its port from?', 'port var', [portEnv(cfg), 'PORT'])
+    if (a === undefined) return undefined
+    if (a === KEEP) return next
+    const name = a.trim()
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) {
+      $.ui.toast(`"${a}" is not a variable name`)
+      return undefined
+    }
+    next.server = { ...next.server, portEnv: name }
+    return next
+  }
+  if (key === 'server.ports') {
+    const a = await ask('Which ports may the server use, first choice first? Type them under Other (3000, 3001).', 'ports', [ports(cfg).join(', '), '3000'])
+    if (a === undefined) return undefined
+    if (a === KEEP) return next
+    const list = parsePorts(a)
+    if (!list) {
+      $.ui.toast(`"${a}" is not a list of ports`)
+      return undefined
+    }
+    next.server = { ...next.server, ports: list }
+    return next
+  }
+  const current = Object.entries(cfg.server?.env ?? {}).map(([k, v]) => `${k}=${v}`).join(' ')
+  const a = await ask('Extra environment for the server? Type it under Other (NAME=value OTHER=1), or None.', 'env', ['None', current])
+  if (a === undefined) return undefined
+  if (a === KEEP) return next
+  if (a === 'None') {
+    if (next.server) delete next.server.env
+    return next
+  }
+  const env = parseEnv(a)
+  if (!env) {
+    $.ui.toast(`"${a}" is not NAME=value pairs`)
+    return undefined
+  }
+  next.server = { ...next.server, env }
+  return next
+}
+
+async function editSetting($: EngineInterface, key: SettingKey) {
+  const next = await askSetting($, key, await read($, settings))
+  if (next) await saveSettings($, next)
+}
+
+// /wb setup: every setting in turn, the server's own only when there is a
+// server, saved once at the end. A dismissed question ends it unsaved.
+async function runSetup($: EngineInterface) {
+  if (!(await read($, repo))) {
+    $.ui.toast('The work band needs a GitHub repo (an origin on github.com)')
+    return
+  }
+  let draft = await read($, settings)
+  for (const key of SETTING_KEYS) {
+    if (key !== 'enabled' && !isEnabled(draft)) break
+    if (key === 'jira.projects' && !jiraSite(draft)) continue
+    if (key.startsWith('server.') && key !== 'server.kind' && serverKind(draft) === 'none') continue
+    const next = await askSetting($, key, draft)
+    if (!next) {
+      $.ui.toast('Work band setup stopped; nothing was saved')
+      return
+    }
+    draft = next
+  }
+  await saveSettings($, draft)
+  $.ui.toast(`Work band settings saved for ${await read($, repo)}`)
+}
+
+// What the session does once it is in a GitHub repo with the band on: the /wb command, the
 // set_topic tool, the PR poll and the server's port.
 async function activate($: EngineInterface) {
-  await $.command.register({ name: 'wb', description: 'Show or hide the PR / Jira / t band', immediate: true }).catch(() => {})
+  await registerCommand($)
   // Listed from turn one, in front of ToolSearch, so the model reaches for it.
   await $.tool
     .register({
@@ -1041,11 +1262,26 @@ async function activate($: EngineInterface) {
   void $.process.run(['git', 'rev-parse', '--show-toplevel']).then(r => {
     if (r.exitCode === 0) repoTop = r.stdout.trim()
   })
+  void $.process.run(['gh', 'repo', 'view', '--json', 'defaultBranchRef', '-q', '.defaultBranchRef.name']).then(async r => {
+    if (r.exitCode === 0 && r.stdout.trim()) await update($, defaultBranch, () => r.stdout.trim())
+  })
   void refreshAll($)
   ensurePolling($)
-  const stored = await $.store.get('port')
-  if (typeof stored === 'number' && parsePort(String(stored)) !== undefined) await update($, port, () => stored)
+  const cfg = await read($, settings)
+  if (serverKind(cfg) === 'none') return
+  const stored = await $.store.get(portKey(await read($, repo)))
+  const at = typeof stored === 'number' && parsePort(String(stored)) !== undefined ? stored : ports(cfg)[0]!
+  await update($, port, () => at)
   if ((await read($, serve)).state !== 'running') void pickFreePort($).catch(() => {})
+}
+
+// /wb toggles the band, /wb settings lists this repo's settings in a pane,
+// /wb setup walks through them. It is registered in any GitHub repo, the
+// band off included, so the settings can turn it back on.
+async function registerCommand($: EngineInterface) {
+  await $.command
+    .register({ name: 'wb', description: 'Work band: show or hide it; `/wb settings` or `/wb setup` for this repo', immediate: true })
+    .catch(() => {})
 }
 
 export const register: Register = on => {
@@ -1055,6 +1291,7 @@ export const register: Register = on => {
     answered = false
     failedChecks = 0
     if (await checkRepo($)) await activate($)
+    else if (await read($, repo)) await registerCommand($)
     else if (!answered) {
       // git failed: try again until it answers, at most MAX_RETRIES times,
       // since outside a git repo it never will
@@ -1079,7 +1316,17 @@ export const register: Register = on => {
   })
 
 
-  on('command.run', { command: 'wb' }, async $ => {
+  on('command.run', { command: 'wb' }, async ($, e) => {
+    const arg = e.args.trim().toLowerCase()
+    if (arg === 'settings') {
+      await $.ui.open({ id: SETTINGS_PANE, title: `Work band settings: ${(await read($, repo)) || 'no GitHub repo'}`, closeOnEscape: true })
+      return { text: 'Work band settings opened.' }
+    }
+    if (arg === 'setup') {
+      void runSetup($).catch(() => {})
+      return { text: 'Work band setup started.' }
+    }
+    if (!(await read($, canServe))) return { text: 'The work band is off for this repo. `/wb settings` or `/wb setup` turns it on.' }
     const hidden = await update($, isHidden, h => !h)
     return { text: hidden ? 'Work band hidden. /wb shows it again.' : 'Work band shown.' }
   })
@@ -1291,12 +1538,39 @@ export const register: Register = on => {
     )
   })
 
+  on('ui.render', { component: 'Pane', requestId: SETTINGS_PANE }, async ($, e) => {
+    const { Box, Button, Text } = $.ui.resolve(e)
+    const [name, cfg] = await Promise.all([read($, repo), read($, settings)])
+    if (!name) return <Text dimColor>No GitHub repo here: the work band has nothing to set.</Text>
+    const rows = describe(cfg)
+    const width = Math.max(...rows.map(r => r.label.length))
+    return (
+      <Box flexDirection="column">
+        <Text dimColor>~/.claude/{SETTINGS_FILE} → {name}. Click a setting to change it.</Text>
+        <Text> </Text>
+        {rows.map(r => (
+          <Button key={`set-${r.key}`} plain label={`Change ${r.label}`} onPress={() => editSetting($, r.key as SettingKey)}>
+            <Text>
+              <Text bold>{r.label.padEnd(width)}</Text>
+              {'  '}
+              {r.value}
+            </Text>
+          </Button>
+        ))}
+        <Text> </Text>
+        <Button key="setup" plain label="Run setup" onPress={() => runSetup($)}>
+          <Text color="suggestion">Run setup…</Text>
+        </Button>
+      </Box>
+    )
+  })
+
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     if (!(await read($, canServe))) return next(e)
     ensurePolling($)
     if (e.props.hasSurvey || (await read($, isHidden))) return next(e)
 
-    const [p, j, s, isServeRepo, at, d, acct, topics, head] = await Promise.all([
+    const [p, j, s, isOn, at, d, acct, topics, head, cfg] = await Promise.all([
       read($, pr),
       read($, jira),
       read($, serve),
@@ -1306,7 +1580,11 @@ export const register: Register = on => {
       read($, account),
       read($, topic),
       read($, branch),
+      read($, settings),
     ])
+    // The server control only where a server is set, Jira only where its site is.
+    const isServeRepo = isOn && serverKind(cfg) !== 'none'
+    const site = jiraSite(cfg)
     const topicLabel = topics.length ? topicText(topics) : undefined
     const branchLabel = head ? fitWidth(head, BRANCH_MAX) : ''
     const { Box, Button, Text } = $.ui.resolve(e)
@@ -1368,9 +1646,9 @@ export const register: Register = on => {
 
     // The key opens the issue in the browser; a Button is a row child, not
     // inside a Text.
-    const jiraPart = j ? (
+    const jiraPart = !site ? null : j ? (
       [
-        <Button key="jira" plain label={j.key} onPress={() => openUrl($, jiraUrl(j.key))}>
+        <Button key="jira" plain label={j.key} onPress={() => openUrl($, jiraUrl(site!, j.key))}>
           <Text bold>{j.key}</Text>
         </Button>,
         'title' in j ? (
@@ -1404,15 +1682,17 @@ export const register: Register = on => {
 
     return (
       <Box flexDirection="column">
-        <Box>
-          {branchLabel ? (
-            <Text key="branch" dimColor>
-              {branchLabel}
-              {'   '}
-            </Text>
-          ) : null}
-          {jiraPart}
-        </Box>
+        {branchLabel || jiraPart ? (
+          <Box key="head">
+            {branchLabel ? (
+              <Text key="branch" dimColor>
+                {branchLabel}
+                {jiraPart ? '   ' : ''}
+              </Text>
+            ) : null}
+            {jiraPart}
+          </Box>
+        ) : null}
         <Box>
           {prPart}
           {topicLabel ? (

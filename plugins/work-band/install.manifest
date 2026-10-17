@@ -5,12 +5,15 @@
 # copied file by file; the whole folder is, and Claude loads it from CLAUDE_CODE_PLUGIN_DIRS.
 
 name   Work band
-about  Band above the prompt: this branch's PR checks, Jira status and files, with a button that restarts the dev server.
+about  Band above the prompt in any GitHub repo: branch, PR checks and files; per repo, Jira and a dev-server button.
 
 mod    mods/work-band    the mod folder, registered in CLAUDE_CODE_PLUGIN_DIRS
 
 tip  /wb                  toggles the band
+tip  /wb settings         this repo's settings (Jira site, server, ports), click one to change it
+tip  /wb setup            asks each setting in turn and saves them to ~/.claude/work-band.json
 tip  click a pane title   opens the PR checks, the files or the server logs beside the transcript
 tip  Files                opens the filetree mod's pane when that mod is installed, else the band's own
 
 note  the band's remembered port and other $.store values were left alone
+note  per-repo settings live in ~/.claude/work-band.json; nothing is written to any repo
