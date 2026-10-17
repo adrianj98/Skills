@@ -434,3 +434,8 @@
   an `mcp__`-named tool's result against MCP's output shape (a string or content blocks) and
   refused the object (`expected string, received object`), so the call failed in a live
   session though the tests passed. Test updated; installed copy updated.
+- `plugins/walkthrough/`: new `walkthrough` skill plugin (SKILL.md, plugin.json, install.manifest,
+  README) plus its marketplace entry and a README section. `/walkthrough [PR|branch]` writes a
+  document touring a PR's code in reading order, one stop per idea with code, `file:line`, and why;
+  it goes to a docs connector/Artifact when available, else an untracked `walkthrough-<PR>.md`.
+  Why: asked for a skill that creates a code-walkthrough document for a PR.

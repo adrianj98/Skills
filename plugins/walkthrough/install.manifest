@@ -1,0 +1,14 @@
+# What ../../install.sh copies when someone installs this plugin without the plugin system.
+# Verbs are documented in ../adversarial-review/install.manifest.
+
+name   Walkthrough
+about  Writes a document that walks a reader through a pull request's code in reading order.
+
+file   skills/walkthrough/SKILL.md  skills/walkthrough/SKILL.md  /walkthrough
+
+# Outside the plugin system there is no /plugin:skill namespace.
+rewrite  /walkthrough:walkthrough  /walkthrough
+
+tip  /walkthrough                 the current branch's PR, or the branch against its base
+tip  /walkthrough 189             PR #189
+tip  /walkthrough feature/x       a branch against the default branch

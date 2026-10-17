@@ -1,0 +1,10 @@
+{
+  "name": "walkthrough",
+  "displayName": "Walkthrough",
+  "version": "0.1.0",
+  "description": "Writes a code walkthrough of a pull request as a document: the change in reading order, one stop per idea, each with the code, a file:line, and why it is there.",
+  "author": { "name": "Adrian Jones", "url": "https://github.com/adrianj98" },
+  "repository": "https://github.com/adrianj98/skills",
+  "license": "MIT",
+  "keywords": ["walkthrough", "pull-request", "pr", "code-review", "documentation", "onboarding"]
+}

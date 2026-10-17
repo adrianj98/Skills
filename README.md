@@ -139,6 +139,19 @@ claude plugin install greenlight@adrianj98-skills
 
 [Full README →](plugins/greenlight/README.md)
 
+### [`walkthrough`](plugins/walkthrough) · v0.1.0
+
+`/walkthrough` — a document that walks a reader through a pull request's code in the order
+they should read it: an overview, then one stop per idea with the code, a `file:line`, what it
+does and why, then the tests and the leftovers. `/walkthrough 189` takes a PR number,
+`/walkthrough feature/x` a branch.
+
+```bash
+claude plugin install walkthrough@adrianj98-skills
+```
+
+[Full README →](plugins/walkthrough/README.md)
+
 ### [`work-band`](plugins/work-band) · v0.2.0
 
 A mod, not a skill: a hooks module that draws a band above the prompt in any GitHub repo. It shows
