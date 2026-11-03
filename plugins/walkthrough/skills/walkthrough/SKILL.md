@@ -2,14 +2,15 @@
 name: walkthrough
 description: A concise, visual code walkthrough — a diagram of the path the change takes, a map of the files, then a few short stops each with the code, a file:line and why. Defaults to the PR branch; also takes a description ("the retry path", "how login works") that focuses the tour or, when there is no PR, picks the code to tour. Use when the user asks for a walkthrough, a code tour, to be walked through a PR, branch, feature or flow, or to explain a change to a reviewer or new teammate.
 argument-hint: "[PR | branch] [description]   (nothing = the PR branch checked out now)"
-allowed-tools: Bash, Read, Grep, Glob, Write
+allowed-tools: Bash, Read, Grep, Glob, Write, Artifact, Skill
 ---
 
 The user invoked this with `$ARGUMENTS`.
 
 A walkthrough is the tour the author gives a reviewer sitting beside them: *here is the
 shape of it, start here, now look at this, this is why.* It is short enough to read in five
-minutes and it shows before it tells. It never judges the code and never edits it.
+minutes and it shows before it tells. It is delivered as an **artifact**: one published page
+with the diagram rendered. It never judges the code and never edits it.
 
 ## 1. Read the arguments
 
@@ -180,15 +181,36 @@ line is the entry point's `path:line`, there is no Tests or Open section unless 
 has an obvious gap, and the file map lists the files on the path with their role instead
 of a tag.
 
-## 6. Deliver it
+## 6. Deliver it as an artifact
 
-- A docs connector or Artifact tool the session's instructions say to use for documents:
-  create the walkthrough there, where the mermaid renders, and give the link.
-- Otherwise write `walkthrough-<PR number or branch>.md` at the repo root (replace `/` in
-  branch names with `-`). Don't commit it or add it to `.gitignore`; say the path in one line
-  and that it's untracked.
-- The user asked for it on the PR: `gh pr comment <n> --body-file <file>`. GitHub renders
-  mermaid. Only when asked.
+The walkthrough is a page, not a chat message. Build it with the `Artifact` tool:
 
-Reply with the link or path, the **In short** sentences, and the ASCII form of the diagram
-when the reader is in a terminal. Don't repeat the document in chat.
+1. Load the `artifact-design` skill first if it's available; its page contract applies.
+2. Write one HTML file in the scratchpad directory, `walkthrough-<PR number or branch>.html`
+   (replace `/` in branch names with `-`), holding the §5 content in order: the title line,
+   the **In short** paragraph, the Shape diagram, the Files map, the stops, Tests, Open.
+   - Render the diagram with mermaid loaded from cdnjs at an exact version, for example
+     `mermaid/11.4.1/mermaid.min.js`, initialised with `theme: 'neutral'` in light and
+     `'dark'` in dark mode. Keep the mermaid source in the page as a `<pre class="mermaid">`.
+   - Put the stop titles under the title line as a numbered list of in-page links, so the
+     route is visible before the first stop.
+   - Each stop's `path:line` is a link to GitHub at the head sha when the PR is there,
+     otherwise plain text. Code goes in `<pre><code>` with the language as a class; a syntax
+     highlighter from cdnjs is fine but not required.
+   - Colours as tokens on `:root`, a dark variant under `prefers-color-scheme: dark`, an
+     explicit `body` background, and nothing wider than a phone at a 16px gutter. The Files
+     map and code blocks scroll sideways rather than the page.
+3. Publish it: `Artifact` with that `file_path`, `icon: "map"`, and a one-sentence
+   `description` from **In short**. The page `<title>` is `Walkthrough · #<n>` or
+   `Walkthrough · <branch>`. Republish to the same path when the user asks for changes.
+
+If there is no `Artifact` tool, write the same content as markdown to
+`walkthrough-<PR number or branch>.md` at the repo root instead. Don't commit it or add it to
+`.gitignore`; say the path in one line and that it's untracked.
+
+The user asked for it on the PR as well: `gh pr comment <n> --body-file <markdown file>`.
+GitHub renders mermaid. Only when asked.
+
+Reply with the artifact link (or the file path), the **In short** sentences, and the ASCII
+form of the diagram so the reader in a terminal sees the shape without opening the page.
+Don't repeat the document in chat.

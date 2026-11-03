@@ -143,8 +143,8 @@ claude plugin install greenlight@adrianj98-skills
 
 `/walkthrough` — a concise, visual tour of a change: one diagram of the path it takes (a
 flowchart, sequence or state diagram, changed nodes highlighted), a map of the changed files,
-then three to eight short stops with the code, a `file:line` and why. Under about 120 lines.
-Defaults to the checked-out PR branch; `/walkthrough 189` takes a PR, `/walkthrough feature/x`
+then three to eight short stops with the code, a `file:line` and why. Under about 120 lines,
+published as an artifact. Defaults to the checked-out PR branch; `/walkthrough 189` takes a PR, `/walkthrough feature/x`
 a branch. Add a description and it narrows the tour (`/walkthrough 189 the retry path`), or
 tours the code itself when there is no PR (`/walkthrough how login works`).
 

@@ -2,9 +2,22 @@
   "name": "walkthrough",
   "displayName": "Walkthrough",
   "version": "0.2.0",
-  "description": "A concise, visual code walkthrough: a diagram of the path the change takes, a map of the changed files, then 3–8 short stops each with the code, a file:line and why. Defaults to the PR branch; also takes a description that focuses the tour or picks the code to tour.",
-  "author": { "name": "Adrian Jones", "url": "https://github.com/adrianj98" },
+  "description": "A concise, visual code walkthrough published as an artifact: a diagram of the path the change takes, a map of the changed files, then 3\u20138 short stops each with the code, a file:line and why. Defaults to the PR branch; also takes a description that focuses the tour or picks the code to tour.",
+  "author": {
+    "name": "Adrian Jones",
+    "url": "https://github.com/adrianj98"
+  },
   "repository": "https://github.com/adrianj98/skills",
   "license": "MIT",
-  "keywords": ["walkthrough", "pull-request", "pr", "code-review", "documentation", "onboarding", "mermaid", "diagram"]
+  "keywords": [
+    "walkthrough",
+    "pull-request",
+    "pr",
+    "code-review",
+    "documentation",
+    "onboarding",
+    "mermaid",
+    "diagram",
+    "artifact"
+  ]
 }

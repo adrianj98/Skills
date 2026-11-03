@@ -3,7 +3,7 @@
 `/walkthrough` — a concise, visual tour of a change. One diagram of the path the change
 takes, a map of the changed files, then three to eight short stops, each with the code as it
 is after the change, a `file:line` linked at the head commit, what it does and why. Under
-about 120 lines, readable in five minutes.
+about 120 lines, readable in five minutes, published as an artifact.
 
 ```bash
 claude plugin install walkthrough@adrianj98-skills
@@ -45,9 +45,10 @@ orders the stops the way the code runs, starting at the entry point, with the ma
 the first three. Where nothing says why a change was made, it says so instead of guessing.
 It never judges or edits the code.
 
-The document goes to a docs connector or Artifact when the session has one, where the
-mermaid renders; otherwise to an untracked `walkthrough-<PR>.md` at the repo root. Ask for
-it on the PR and it posts there as a comment.
+The walkthrough is published as an artifact: one HTML page, the diagram rendered with
+mermaid, the route as a list of links at the top, every `file:line` linked to GitHub at the
+head sha. Where there is no Artifact tool it falls back to an untracked `walkthrough-<PR>.md`
+at the repo root. Ask for it on the PR and it posts there as a comment too.
 
 ## Installing without the plugin system
 

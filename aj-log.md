@@ -457,3 +457,9 @@
   `walkthrough` added to `plugins/index`, which it was missing from, so `install.sh` can install it.
   Why: asked for a code-walkthrough skill that defaults to the PR branch, can take a description,
   and is concise and visual.
+- `plugins/walkthrough/skills/walkthrough/SKILL.md`: the walkthrough is delivered as an artifact.
+  §6 now builds one HTML page in the scratchpad (mermaid from cdnjs at an exact version, the route
+  as in-page links, `file:line` linked at the head sha, light/dark tokens) and publishes it with
+  the `Artifact` tool; the markdown file at the repo root is the fallback when there is no
+  Artifact tool. `allowed-tools` gains Artifact and Skill. README, plugin README, descriptions.
+  Why: asked for it to create an artifact.

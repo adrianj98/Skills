@@ -208,7 +208,7 @@
       "name": "walkthrough",
       "displayName": "Walkthrough",
       "source": "./plugins/walkthrough",
-      "description": "A concise, visual code walkthrough: a diagram of the path the change takes, a map of the changed files, then 3\u20138 short stops each with the code, a file:line and why. Defaults to the PR branch; also takes a description that focuses the tour or picks the code to tour.",
+      "description": "A concise, visual code walkthrough published as an artifact: a diagram of the path the change takes, a map of the changed files, then 3\u20138 short stops each with the code, a file:line and why. Defaults to the PR branch; also takes a description that focuses the tour or picks the code to tour.",
       "version": "0.2.0",
       "author": {
         "name": "Adrian Jones",
@@ -224,7 +224,8 @@
         "documentation",
         "onboarding",
         "mermaid",
-        "diagram"
+        "diagram",
+        "artifact"
       ],
       "category": "development"
     }
