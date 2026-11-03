@@ -208,8 +208,8 @@
       "name": "walkthrough",
       "displayName": "Walkthrough",
       "source": "./plugins/walkthrough",
-      "description": "Writes a code walkthrough of a pull request as a document: the change in reading order, one stop per idea, each with the code, a file:line, and why it is there.",
-      "version": "0.1.0",
+      "description": "A concise, visual code walkthrough: a diagram of the path the change takes, a map of the changed files, then 3\u20138 short stops each with the code, a file:line and why. Defaults to the PR branch; also takes a description that focuses the tour or picks the code to tour.",
+      "version": "0.2.0",
       "author": {
         "name": "Adrian Jones",
         "url": "https://github.com/adrianj98"
@@ -222,7 +222,9 @@
         "pr",
         "code-review",
         "documentation",
-        "onboarding"
+        "onboarding",
+        "mermaid",
+        "diagram"
       ],
       "category": "development"
     }

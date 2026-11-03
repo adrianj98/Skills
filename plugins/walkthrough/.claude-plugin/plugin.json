@@ -1,10 +1,10 @@
 {
   "name": "walkthrough",
   "displayName": "Walkthrough",
-  "version": "0.1.0",
-  "description": "Writes a code walkthrough of a pull request as a document: the change in reading order, one stop per idea, each with the code, a file:line, and why it is there.",
+  "version": "0.2.0",
+  "description": "A concise, visual code walkthrough: a diagram of the path the change takes, a map of the changed files, then 3–8 short stops each with the code, a file:line and why. Defaults to the PR branch; also takes a description that focuses the tour or picks the code to tour.",
   "author": { "name": "Adrian Jones", "url": "https://github.com/adrianj98" },
   "repository": "https://github.com/adrianj98/skills",
   "license": "MIT",
-  "keywords": ["walkthrough", "pull-request", "pr", "code-review", "documentation", "onboarding"]
+  "keywords": ["walkthrough", "pull-request", "pr", "code-review", "documentation", "onboarding", "mermaid", "diagram"]
 }

@@ -2,13 +2,14 @@
 # Verbs are documented in ../adversarial-review/install.manifest.
 
 name   Walkthrough
-about  Writes a document that walks a reader through a pull request's code in reading order.
+about  A concise, visual code walkthrough of a PR branch, or of the code a description names.
 
 file   skills/walkthrough/SKILL.md  skills/walkthrough/SKILL.md  /walkthrough
 
 # Outside the plugin system there is no /plugin:skill namespace.
 rewrite  /walkthrough:walkthrough  /walkthrough
 
-tip  /walkthrough                 the current branch's PR, or the branch against its base
-tip  /walkthrough 189             PR #189
-tip  /walkthrough feature/x       a branch against the default branch
+tip  /walkthrough                     the checked-out branch's PR, or the branch against its base
+tip  /walkthrough 189                 PR #189
+tip  /walkthrough 189 the retry path  only the stops that part of the PR needs
+tip  /walkthrough how login works     a tour of the code as it is, no PR needed

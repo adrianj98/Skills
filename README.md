@@ -139,12 +139,14 @@ claude plugin install greenlight@adrianj98-skills
 
 [Full README →](plugins/greenlight/README.md)
 
-### [`walkthrough`](plugins/walkthrough) · v0.1.0
+### [`walkthrough`](plugins/walkthrough) · v0.2.0
 
-`/walkthrough` — a document that walks a reader through a pull request's code in the order
-they should read it: an overview, then one stop per idea with the code, a `file:line`, what it
-does and why, then the tests and the leftovers. `/walkthrough 189` takes a PR number,
-`/walkthrough feature/x` a branch.
+`/walkthrough` — a concise, visual tour of a change: one diagram of the path it takes (a
+flowchart, sequence or state diagram, changed nodes highlighted), a map of the changed files,
+then three to eight short stops with the code, a `file:line` and why. Under about 120 lines.
+Defaults to the checked-out PR branch; `/walkthrough 189` takes a PR, `/walkthrough feature/x`
+a branch. Add a description and it narrows the tour (`/walkthrough 189 the retry path`), or
+tours the code itself when there is no PR (`/walkthrough how login works`).
 
 ```bash
 claude plugin install walkthrough@adrianj98-skills

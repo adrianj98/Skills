@@ -445,3 +445,15 @@
   a `/model` switch shows on the next one. Tests for `modelLabel` and the band's ending; README
   sentence; installed copy in `~/.claude/mods/work-band` updated.
   Why: asked for the work band to show the model in use, with the subscription.
+- `plugins/walkthrough/`: `/walkthrough` reworked to be concise and visual, v0.2.0. The document
+  is under ~120 lines: a **Shape** diagram chosen by what the change is (`flowchart LR` for a call
+  path, `sequenceDiagram` for a request between services, `stateDiagram-v2` for a lifecycle, a
+  before/after table for a data shape, nothing for one function), at most 12 nodes named as the
+  code names them with changed nodes highlighted, ASCII where mermaid can't render; a **Files**
+  map tagging each file `core`/`shape`/`wire`/`test`/`noise`; then 3–8 stops of 5–15 lines and
+  1–3 sentences. It takes a description after the target: one naming part of the diff narrows the
+  tour, one naming nothing in it (or given on the default branch) tours the code as it is from the
+  entry point it names. Plugin README, manifest tips, marketplace entry and README section updated;
+  `walkthrough` added to `plugins/index`, which it was missing from, so `install.sh` can install it.
+  Why: asked for a code-walkthrough skill that defaults to the PR branch, can take a description,
+  and is concise and visual.

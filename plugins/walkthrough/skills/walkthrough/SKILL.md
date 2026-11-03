@@ -1,139 +1,194 @@
 ---
 name: walkthrough
-description: Write a code walkthrough of a pull request as a document — the change in the order a reader should take it, one stop per idea, each with the code, a file:line and why it is there. Point it at a PR number, a branch, or nothing for the current branch. Use when the user asks for a walkthrough, a code tour, a guided tour of a PR, a doc explaining a PR to reviewers or a new teammate, or "walk me through this PR".
-argument-hint: "[PR number | PR URL | branch]   (nothing = the current branch)"
+description: A concise, visual code walkthrough — a diagram of the path the change takes, a map of the files, then a few short stops each with the code, a file:line and why. Defaults to the PR branch; also takes a description ("the retry path", "how login works") that focuses the tour or, when there is no PR, picks the code to tour. Use when the user asks for a walkthrough, a code tour, to be walked through a PR, branch, feature or flow, or to explain a change to a reviewer or new teammate.
+argument-hint: "[PR | branch] [description]   (nothing = the PR branch checked out now)"
 allowed-tools: Bash, Read, Grep, Glob, Write
 ---
 
 The user invoked this with `$ARGUMENTS`.
 
-A walkthrough is not a review and not a diff summary. It is the tour the author would give a
-reviewer sitting beside them: *start here, this is the idea, now look at this, this is why.*
-It never judges the code and never edits it. The only file it writes is the document.
+A walkthrough is the tour the author gives a reviewer sitting beside them: *here is the
+shape of it, start here, now look at this, this is why.* It is short enough to read in five
+minutes and it shows before it tells. It never judges the code and never edits it.
 
-## 1. Find the change
+## 1. Read the arguments
 
-- **a number or PR URL** — `gh pr view <n> --json number,title,body,url,baseRefName,headRefName,author,commits,files`
-  and `gh pr diff <n>`.
-- **a branch** — its PR if it has one (`gh pr view <branch>`); otherwise the branch against
-  the default branch (`gh repo view --json defaultBranchRef -q .defaultBranchRef.name`,
-  falling back to `origin/HEAD`): `git diff <base>...<branch>`.
-- **nothing** — the current branch, the same way. On the default branch with no PR, say so
-  and stop.
+Split `$ARGUMENTS` into a **target** and a **description**:
 
-If `gh` is missing or not signed in, use the git diff and say the PR description was not read.
+- The first token is the target when it is a number, a PR URL, or a branch that
+  `git rev-parse --verify --quiet <token>` or `origin/<token>` resolves. Everything after
+  it is the description.
+- Otherwise the target is the checked-out branch and the whole text is the description.
+- Nothing at all: the checked-out branch, no description.
 
-Read the diff against the **merge base** (`base...head`), never `base..head`: changes that
-landed on the base since the branch forked are not part of this PR.
+Then find the code to tour:
 
-## 2. Understand it before ordering it
-
-Read, in this order, until you can say in two sentences what the PR does and why:
-
-1. The PR title and description, and any issue or Jira key it names.
-2. The commit messages — they often say *why* where the description says *what*.
-3. `aj-log.md` lines the branch added, if the repo has one.
-4. Every changed file in full around each hunk, not just the hunk. A three-line change in a
-   function is unreadable without the function. Open callers and callees the diff doesn't
-   touch when a stop needs them.
-
-Sort the files into:
-
-| | |
+| target | how |
 |---|---|
-| **core** | the change itself — new behaviour, the fix |
-| **plumbing** | wiring the core in: registration, routes, DI, exports, config |
-| **shape** | types, schemas, migrations the core depends on |
-| **tests** | what proves it |
-| **noise** | lockfiles, generated code, snapshots, renames, formatting-only hunks |
+| number or URL | `gh pr view <n> --json title,body,url,baseRefName,headRefName,author,headRefOid,additions,deletions,changedFiles` and `gh pr diff <n>` |
+| branch | its PR if one exists (`gh pr view <branch>`), else the diff against the default branch (`gh repo view --json defaultBranchRef -q .defaultBranchRef.name`, falling back to `origin/HEAD`) |
+| checked-out branch | the same, for `git branch --show-current` |
 
-Noise gets one line at the end and no stops.
+Always diff against the **merge base**, `base...head`, never `base..head`. If `gh` is
+missing or signed out, use the git diff and say the PR description wasn't read.
+
+**The description decides the scope.**
+
+- With a diff, and the description names part of it ("the retry path", "just the
+  migration"): tour only the stops that part needs. Mention in one line what the rest of
+  the PR does.
+- With a diff, and the description names nothing in it, or the checked-out branch is the
+  default branch with no PR: tour the **code as it is**, not a diff. Find the entry point the
+  description names (`grep`, routes, commands, exports), follow it, and treat the files on
+  that path as the change set. Say at the top that this is a tour of the code, not of a PR.
+- No description and the default branch is checked out with no PR: say so and stop.
+
+## 2. Understand it
+
+Read until you can say in one sentence what it does and why:
+
+1. The PR title and description, and any issue it names.
+2. The commit messages: they often carry the *why*.
+3. Lines the branch added to `aj-log.md`, if the repo has one.
+4. Each changed file **in full around every hunk**, not the hunk alone, plus the callers and
+   callees it needs. A three-line change inside a function is unreadable without the function.
+
+Tag each file:
+
+| tag | |
+|---|---|
+| `core` | the change itself: the new behaviour, the fix |
+| `shape` | types, schemas, migrations the core depends on |
+| `wire` | registration, routes, DI, exports, config that plug the core in |
+| `test` | what proves it |
+| `noise` | lockfiles, generated code, snapshots, renames, formatting-only hunks |
 
 ## 3. Choose the route
 
 Order by how a reader builds understanding, never alphabetically or in diff order:
 
-- Start at the **entry point** — the route, command, event, UI action or public function
-  where the new behaviour begins — unless the PR is mostly a new data shape, in which case
-  start with the shape.
+- Start where the behaviour **begins**: the route, command, event, UI action or public
+  function. If the PR is mostly a new data shape, start with the shape.
 - Follow the call path the way the code runs. Introduce a type or helper at the first stop
-  that needs it, not before.
-- Put the stop with the main idea early. A reader who stops after three stops should still
-  have understood the PR.
-- Tests come after the code they prove, as one stop that says what scenarios are covered and
-  which aren't.
-- Plumbing goes last, grouped.
+  that needs it.
+- The main idea is in the first three stops. A reader who stops there has still understood
+  the PR.
+- Tests are one stop after the code they prove. `wire` and `noise` get no stops; the file
+  map covers them.
 
-One stop is one idea, usually 5–40 lines of one file. Split a big hunk that does two things;
-merge small hunks across files that do one. Aim for 4–12 stops. A PR that needs more than
-15 is several PRs; say so in the overview and group stops into parts.
+**3 to 8 stops.** One stop is one idea in one file, 5 to 15 lines of code. Split a hunk that
+does two things, merge small hunks that do one. If it needs more than 8, split the tour
+into parts with a heading each, or say the PR is really several and tour the biggest.
 
-## 4. Write each stop
+## 4. Draw it
 
-````markdown
-### 3. Retry the upload when the token has expired
+Diagrams are the point. Pick by what the change is, and draw **only the part the change
+touches**, with unchanged context nodes in plain style and changed ones highlighted:
 
-`src/upload/client.ts:84-112`
+| the change is | draw |
+|---|---|
+| a call path across 2+ files or components | `flowchart LR` of the path, one node per function or module, edges labelled with what crosses them |
+| a request, event or message between actors or services | `sequenceDiagram` |
+| a lifecycle or status field | `stateDiagram-v2` |
+| a data shape | a before \| after table, not a diagram |
+| one file, one function | nothing: the file map is enough |
 
-```ts
-<the changed code, trimmed to what this stop is about; elide with // …>
+Rules for every diagram:
+
+- At most 12 nodes. More than that is a sign the tour is too wide.
+- Nodes carry the code's own names: `uploadClient.send`, not "the upload layer".
+- Mark changed nodes: in mermaid, `classDef changed stroke-width:3px` and `:::changed`; a
+  new node also gets `(new)` in its label.
+- Where the output can't render mermaid (plain terminal chat), draw the same thing in ASCII
+  with `-->` arrows and `[brackets]`, and mark changed nodes with `*`.
+
+The **file map** is a second visual, always present: a tree of the changed files, each with
+its tag and three to six words on its role.
+
+```
+src/upload/
+  client.ts          core   retry once on an expired token
+  token.ts           shape  TokenState gains expiresAt
+  index.ts           wire   export the client
+test/upload.test.ts  test   expired, refreshed, refresh fails
+package-lock.json    noise
 ```
 
-What it does, in two to five sentences, in terms of behaviour, not syntax. Then **why** —
-from the description, a commit message or the code around it. If the why isn't written
-anywhere, say "the PR doesn't say why" rather than inventing a reason.
+## 5. Write it
 
-**Before:** one line on how it behaved before, when that helps.
-**Look at:** the one or two lines a reviewer should actually check here, if any.
-````
+````markdown
+# <PR title> · #<n>
 
-- Quote the code **as it is after the PR**. Show the before side only when the change is the
-  point (a condition flipped, a default changed), as a short `diff` block.
-- Every stop has a `path:line` or `path:start-end` from the head of the PR. When the PR is on
-  GitHub, also link it: `https://github.com/<owner>/<repo>/blob/<head sha>/<path>#L84-L112`
-  (use the head commit sha, not the branch name, so links don't drift).
-- Name things the way the code names them. No "this elegant approach", no "robust". Plain
-  sentences.
-- **Look at** is for things the reader needs to verify, not opinions: an ordering
-  assumption, a value that crosses a boundary, a behaviour change for existing callers.
+<PR link> · <author> · `<base>` ← `<head>` · <files> files, +<added> −<removed>
 
-## 5. Assemble the document
+**In short.** One or two sentences: what changes for a caller or user, and why.
 
-```markdown
-# Walkthrough: <PR title> (#<n>)
+## Shape
 
-<link to PR> · <author> · <base> ← <head> · <files changed>, +<added> −<removed>
+```mermaid
+<the one diagram from §4, or the before | after table>
+```
 
-## In short
-Two to four sentences: what changes for a user or caller, and why.
+## Files
 
-## The route
-A numbered list of the stops' titles, so the reader sees the whole tour first.
-Add one ```mermaid flowchart of the call path when the change spans 3+ components;
-skip it otherwise.
+```
+<the file map>
+```
 
 ## Stops
-### 1. …
+
+### 1. <Verb phrase: what this stop does> · `src/upload/client.ts:84`
+
+```ts
+<5–15 lines as they are after the change; elide with // …>
+```
+
+One to three sentences: what it does in terms of behaviour, then why, from the
+description, a commit message or the surrounding code. If nothing says why, write "the
+PR doesn't say why" rather than inventing one.
+
+**Before →** one line on the old behaviour, only when the change is to existing behaviour.
+**Check →** the one line a reviewer should actually verify here, only when there is one.
+
 ### 2. …
 
 ## Tests
-What's covered, what isn't. How to run them, as a fenced command.
 
-## Also in this PR
-Plumbing and noise, one line each: `path` — what and why.
+One line on what's covered, one on what isn't, and the command to run them.
 
-## Not answered by the code
-Open questions — a missing why, behaviour the diff implies but doesn't show. Omit if none.
-```
+## Open
+
+- A missing why, or behaviour the diff implies but doesn't show. Omit the section if none.
+````
+
+Budgets, hard:
+
+- **Whole document under ~120 lines**, diagrams and code included. Cut stops before cutting
+  the diagram.
+- In short: 2 sentences. Each stop: 1 to 3 sentences of prose. Tests: 3 lines.
+- Code is quoted **as it is after the change**. Show the before side only when the change
+  is the point (a flipped condition, a changed default), as a 4-line `diff` block.
+- Every stop has `path:line` or `path:start-end` at the head of the branch. When the PR is
+  on GitHub, link it at the head **sha**, not the branch name, so links don't drift:
+  `https://github.com/<owner>/<repo>/blob/<headRefOid>/<path>#L84-L112`.
+- Names as the code names them. No "elegant", no "robust", no "simply". Plain sentences.
+- **Check →** is for things to verify, never opinions: an ordering assumption, a value that
+  crosses a boundary, a change in behaviour for existing callers.
+
+For a tour of the code rather than a PR (§1): the title is the description, the header
+line is the entry point's `path:line`, there is no Tests or Open section unless the code
+has an obvious gap, and the file map lists the files on the path with their role instead
+of a tag.
 
 ## 6. Deliver it
 
-- If the session has a docs connector or an Artifact tool that its instructions say to use
-  for documents, create the walkthrough there and give the link.
-- Otherwise write it to `walkthrough-<PR number or branch>.md` at the repo root (replace `/`
-  in branch names with `-`). Don't commit it and don't add it to `.gitignore`; tell the user
-  the path in one line and that it's untracked.
-- If the user asked for it posted on the PR, `gh pr comment <n> --body-file <file>` — only
-  when asked.
+- A docs connector or Artifact tool the session's instructions say to use for documents:
+  create the walkthrough there, where the mermaid renders, and give the link.
+- Otherwise write `walkthrough-<PR number or branch>.md` at the repo root (replace `/` in
+  branch names with `-`). Don't commit it or add it to `.gitignore`; say the path in one line
+  and that it's untracked.
+- The user asked for it on the PR: `gh pr comment <n> --body-file <file>`. GitHub renders
+  mermaid. Only when asked.
 
-Reply with the link or path and the "In short" paragraph. Don't repeat the document in chat.
+Reply with the link or path, the **In short** sentences, and the ASCII form of the diagram
+when the reader is in a terminal. Don't repeat the document in chat.
