@@ -139,13 +139,14 @@ claude plugin install greenlight@adrianj98-skills
 
 [Full README →](plugins/greenlight/README.md)
 
-### [`walkthrough`](plugins/walkthrough) · v0.2.0
+### [`walkthrough`](plugins/walkthrough) · v0.3.0
 
-`/walkthrough` — a concise, visual tour of a change: one diagram of the path it takes (a
-flowchart, sequence or state diagram, changed nodes highlighted), a map of the changed files,
-then three to eight short stops with the code, a `file:line` and why. Under about 120 lines,
-published as an artifact. Defaults to the checked-out PR branch; `/walkthrough 189` takes a PR, `/walkthrough feature/x`
-a branch. Add a description and it narrows the tour (`/walkthrough 189 the retry path`), or
+`/walkthrough` — a tour of a change that shows before it tells, always published as an
+artifact page: a clickable diagram of the path the change takes, a file map with +/− bars,
+then three to eight stop cards, each with a locator, a picture of what the stop does (branch
+diagram, timing sequence, before │ after, shape cards) and the code with callouts. Defaults
+to the checked-out PR branch; `/walkthrough 189` takes a PR, `/walkthrough feature/x` a
+branch. Add a description and it narrows the tour (`/walkthrough 189 the retry path`), or
 tours the code itself when there is no PR (`/walkthrough how login works`).
 
 ```bash

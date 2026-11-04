@@ -1,5 +1,23 @@
 # aj-log
 
+## 2026-11-04 — walkthrough: always an artifact, as visual as possible (v0.3.0)
+
+- Why: the user wants the walkthrough as a Claude artifact, not a markdown file, and as
+  visual as possible. Another session had read the old markdown fallback as permission to
+  skip the artifact.
+- `SKILL.md` §4–6 rewritten. Every section and every stop gets a picture:
+  - a numbers strip, and a hero diagram whose numbered nodes link to their stops
+  - a route stepper, and a file map with tag pills and +/− bars
+  - per stop: a locator plus a branch flowchart, timing sequence, before │ after panel,
+    shape cards, value bar or line callouts, picked by what the stop does
+  - a tests coverage grid
+  Mermaid is themed from the page tokens. Prose is capped at ~350 words. It starts with
+  Artifact `quickstart`.
+- The markdown fallback is gone: with no Artifact tool it says so and stops. A PR comment,
+  only when asked, holds the summary, the diagram and the link.
+- Version 0.3.0; README, plugin.json and marketplace description updated; reinstalled into
+  `~/.claude/skills/walkthrough`.
+
 ## 2026-11-04 — work-band: random port from a range
 
 - Why: the user wants the band to pick a random port from a range, say 1930-1980, and check

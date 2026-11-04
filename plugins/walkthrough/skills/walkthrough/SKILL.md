@@ -1,6 +1,6 @@
 ---
 name: walkthrough
-description: A concise, visual code walkthrough — a diagram of the path the change takes, a map of the files, then a few short stops each with the code, a file:line and why. Defaults to the PR branch; also takes a description ("the retry path", "how login works") that focuses the tour or, when there is no PR, picks the code to tour. Use when the user asks for a walkthrough, a code tour, to be walked through a PR, branch, feature or flow, or to explain a change to a reviewer or new teammate.
+description: A highly visual code walkthrough published as an artifact page — a clickable diagram of the path the change takes, a file map with change bars, then a few short stops each with a locator, a diagram or before/after panel, annotated code, a file:line and why. Defaults to the PR branch; also takes a description ("the retry path", "how login works") that focuses the tour or, when there is no PR, picks the code to tour. Use when the user asks for a walkthrough, a code tour, to be walked through a PR, branch, feature or flow, or to explain a change to a reviewer or new teammate.
 argument-hint: "[PR | branch] [description]   (nothing = the PR branch checked out now)"
 allowed-tools: Bash, Read, Grep, Glob, Write, Artifact, Skill
 ---
@@ -9,8 +9,9 @@ The user invoked this with `$ARGUMENTS`.
 
 A walkthrough is the tour the author gives a reviewer sitting beside them: *here is the
 shape of it, start here, now look at this, this is why.* It is short enough to read in five
-minutes and it shows before it tells. It is delivered as an **artifact**: one published page
-with the diagram rendered. It never judges the code and never edits it.
+minutes and it **shows before it tells**: a page of diagrams, maps and annotated code with
+short captions. It is always delivered as a published **artifact**, never a markdown file.
+It never judges the code and never edits it.
 
 ## 1. Read the arguments
 
@@ -83,134 +84,144 @@ into parts with a heading each, or say the PR is really several and tour the big
 
 ## 4. Draw it
 
-Diagrams are the point. Pick by what the change is, and draw **only the part the change
-touches**, with unchanged context nodes in plain style and changed ones highlighted:
+The page shows before it tells. **Every section has a picture, and every stop has at least
+one visual beside its code.** Prose is the caption, never the main thing. If a sentence
+describes a shape, flow, order or comparison, draw it.
+
+### The hero diagram (always, at the top)
+
+Pick by what the change is, and draw **only the part the change touches**. Unchanged
+context nodes get the plain style and changed ones are highlighted:
 
 | the change is | draw |
 |---|---|
 | a call path across 2+ files or components | `flowchart LR` of the path, one node per function or module, edges labelled with what crosses them |
 | a request, event or message between actors or services | `sequenceDiagram` |
 | a lifecycle or status field | `stateDiagram-v2` |
-| a data shape | a before \| after table, not a diagram |
-| one file, one function | nothing: the file map is enough |
+| a data shape | before → after cards (below), plus a flowchart of who reads and writes it |
+| one file, one function | a `flowchart TD` of the function's branches, the changed branch highlighted |
 
-Rules for every diagram:
+Rules:
 
 - At most 12 nodes. More than that is a sign the tour is too wide.
 - Nodes carry the code's own names: `uploadClient.send`, not "the upload layer".
-- Mark changed nodes: in mermaid, `classDef changed stroke-width:3px` and `:::changed`; a
-  new node also gets `(new)` in its label.
-- Where the output can't render mermaid (plain terminal chat), draw the same thing in ASCII
-  with `-->` arrows and `[brackets]`, and mark changed nodes with `*`.
+- Changed nodes: `classDef changed` with the accent colour and a thick stroke. New nodes:
+  `classDef added` in the "added" colour, with `(new)` in the label. Removed nodes:
+  `classDef removed`, dashed and struck through.
+- **Number the nodes by stop**: a node a stop covers gets a `①②③` badge in its label and a
+  mermaid `click <node> href "#stop-N"`, so the diagram is the table of contents.
+  Initialise mermaid with `securityLevel: 'loose'` so the clicks work.
 
-The **file map** is a second visual, always present: a tree of the changed files, each with
-its tag and three to six words on its role.
+### Per-stop visuals (one or more per stop, picked by what the stop does)
 
-```
-src/upload/
-  client.ts          core   retry once on an expired token
-  token.ts           shape  TokenState gains expiresAt
-  index.ts           wire   export the client
-test/upload.test.ts  test   expired, refreshed, refresh fails
-package-lock.json    noise
-```
+| the stop | its visual |
+|---|---|
+| any stop | a **locator**: the hero path as a row of small chips with this stop's node lit, so the reader always sees where they are |
+| changes a condition, default or branch | a mini `flowchart TD` of the branches, the new path highlighted |
+| adds a retry, loop, queue or async step | a mini `sequenceDiagram` of the timing |
+| changes behaviour of existing code | a **before │ after** split panel, old code on the left and new on the right, the changed lines tinted |
+| changes a type, schema or payload | **shape cards**: before and after side by side, fields as rows, added rows green, removed rows red and struck, changed rows amber with old → new |
+| changes a number, limit or timeout | a small inline bar or number line showing old vs new value |
+| everything else | the code with the diff's added lines tinted and **numbered callouts** (①②) on the 1–3 lines that matter, each explained in a one-line note under the code |
 
-## 5. Write it
+Never use a diagram that only restates the code in boxes. A visual must show something
+the code doesn't: where it sits, what order things happen in, what changed.
 
-````markdown
-# <PR title> · #<n>
+### The file map (always)
 
-<PR link> · <author> · `<base>` ← `<head>` · <files> files, +<added> −<removed>
+A visual list of the changed files, not a text tree:
 
-**In short.** One or two sentences: what changes for a caller or user, and why.
+- Grouped by folder, each file a row: the name, a coloured **tag pill** (`core`, `shape`,
+  `wire`, `test`, `noise`), three to six words on its role, and a **+/− bar** whose green
+  and red widths scale with its added and removed lines (`git diff --numstat base...head`).
+- Files that have a stop link to it and show its number badge. `noise` rows are dimmed and
+  collapsed under one `<details>` line.
 
-## Shape
+### The numbers strip (always)
 
-```mermaid
-<the one diagram from §4, or the before | after table>
-```
+Under the title: files changed, +added, −removed as large figures, and one stacked bar of
+the change split by tag (how much is core vs tests vs wiring).
 
-## Files
+### Tests
 
-```
-<the file map>
-```
+A **coverage grid**: one row per behaviour the change adds or alters, with a ✓ when a test
+covers it (linking to the test's `path:line`) and an empty, amber cell when nothing does.
+Then the command to run them.
 
-## Stops
+## 5. What goes on the page
 
-### 1. <Verb phrase: what this stop does> · `src/upload/client.ts:84`
+In this order:
 
-```ts
-<5–15 lines as they are after the change; elide with // …>
-```
-
-One to three sentences: what it does in terms of behaviour, then why, from the
-description, a commit message or the surrounding code. If nothing says why, write "the
-PR doesn't say why" rather than inventing one.
-
-**Before →** one line on the old behaviour, only when the change is to existing behaviour.
-**Check →** the one line a reviewer should actually verify here, only when there is one.
-
-### 2. …
-
-## Tests
-
-One line on what's covered, one on what isn't, and the command to run them.
-
-## Open
-
-- A missing why, or behaviour the diff implies but doesn't show. Omit the section if none.
-````
+1. **Title line**: `<PR title> · #<n>`, then the PR link, author, `base ← head`.
+2. **Numbers strip** (§4).
+3. **In short**: one or two sentences, set large. What changes for a caller or user, and why.
+4. **Hero diagram** (§4), with its clickable stop numbers.
+5. **Route**: the stops as a horizontal numbered stepper (wraps on a phone), each linking to
+   its stop.
+6. **Files** map (§4).
+7. **Stops**, each a card:
+   - Header: the number badge, a verb phrase saying what the stop does, and `path:line` as a
+     link to GitHub at the head **sha**
+     (`https://github.com/<owner>/<repo>/blob/<headRefOid>/<path>#L84-L112`), else plain text.
+   - Locator chips, then the stop's visual(s) from §4.
+   - The code: 5–15 lines as they are after the change, elided with `// …`, added lines
+     tinted, callouts on the lines that matter.
+   - One to three sentences: what it does in terms of behaviour, then why, taken from the
+     description, a commit message or the surrounding code. If nothing says why, write "the
+     PR doesn't say why" rather than inventing one.
+   - Optional chips: **Before →** the old behaviour in one line, only when existing behaviour
+     changed; **Check →** the one thing a reviewer should verify here (an ordering
+     assumption, a value crossing a boundary, a change for existing callers), never an opinion.
+8. **Tests** coverage grid (§4).
+9. **Open**: missing whys, or behaviour the diff implies but doesn't show. Shown as amber
+   notes. Omit when there are none.
 
 Budgets, hard:
 
-- **Whole document under ~120 lines**, diagrams and code included. Cut stops before cutting
-  the diagram.
-- In short: 2 sentences. Each stop: 1 to 3 sentences of prose. Tests: 3 lines.
-- Code is quoted **as it is after the change**. Show the before side only when the change
-  is the point (a flipped condition, a changed default), as a 4-line `diff` block.
-- Every stop has `path:line` or `path:start-end` at the head of the branch. When the PR is
-  on GitHub, link it at the head **sha**, not the branch name, so links don't drift:
-  `https://github.com/<owner>/<repo>/blob/<headRefOid>/<path>#L84-L112`.
+- **Prose under ~350 words on the whole page**, code and diagram labels not counted. In
+  short: 2 sentences; each stop 1 to 3. When it runs long, cut words, never pictures.
 - Names as the code names them. No "elegant", no "robust", no "simply". Plain sentences.
-- **Check →** is for things to verify, never opinions: an ordering assumption, a value that
-  crosses a boundary, a change in behaviour for existing callers.
 
-For a tour of the code rather than a PR (§1): the title is the description, the header
-line is the entry point's `path:line`, there is no Tests or Open section unless the code
-has an obvious gap, and the file map lists the files on the path with their role instead
-of a tag.
+For a tour of the code rather than a PR (§1): the title is the description, the header line
+is the entry point's `path:line`, the numbers strip shows files and lines on the path
+instead of a diff, the file map gives each file's role instead of a tag and drops the +/−
+bars, and there are no Tests or Open sections unless the code has an obvious gap. Stops
+show the code as it is, with callouts instead of tinted added lines.
 
 ## 6. Deliver it as an artifact
 
-The walkthrough is a page, not a chat message. Build it with the `Artifact` tool:
+The walkthrough is always a published **artifact**: never a markdown file, never a
+document pasted in chat.
 
-1. Load the `artifact-design` skill first if it's available; its page contract applies.
+1. Start the page the way the `Artifact` tool says: `quickstart` with `intent: "other"`,
+   then follow what it returns (and load `artifact-design` when it says to). Its page
+   contract applies over anything here.
 2. Write one HTML file in the scratchpad directory, `walkthrough-<PR number or branch>.html`
-   (replace `/` in branch names with `-`), holding the §5 content in order: the title line,
-   the **In short** paragraph, the Shape diagram, the Files map, the stops, Tests, Open.
-   - Render the diagram with mermaid loaded from cdnjs at an exact version, for example
-     `mermaid/11.4.1/mermaid.min.js`, initialised with `theme: 'neutral'` in light and
-     `'dark'` in dark mode. Keep the mermaid source in the page as a `<pre class="mermaid">`.
-   - Put the stop titles under the title line as a numbered list of in-page links, so the
-     route is visible before the first stop.
-   - Each stop's `path:line` is a link to GitHub at the head sha when the PR is there,
-     otherwise plain text. Code goes in `<pre><code>` with the language as a class; a syntax
-     highlighter from cdnjs is fine but not required.
-   - Colours as tokens on `:root`, a dark variant under `prefers-color-scheme: dark`, an
-     explicit `body` background, and nothing wider than a phone at a 16px gutter. The Files
-     map and code blocks scroll sideways rather than the page.
+   (replace `/` in branch names with `-`), with the §5 content in order.
+   - Mermaid from cdnjs at an exact version, for example `mermaid/11.4.1/mermaid.min.js`,
+     with `securityLevel: 'loose'` and `theme: 'base'`, its `themeVariables` taken from the
+     page's colour tokens so the diagrams match the page in light and dark. Re-render when
+     the colour scheme changes. Keep each diagram's source in a `<pre class="mermaid">`.
+   - Syntax highlighting from cdnjs (highlight.js or Prism at an exact version). Tint and
+     callouts are spans you add around the lines, not images.
+   - Colour tokens on `:root`: background, surface, text, muted, accent (changed), added
+     (green), removed (red), warn (amber), and one colour per file tag. A dark variant
+     under `prefers-color-scheme: dark`, an explicit `body` background.
+   - Works at phone width with a 16px gutter: before │ after and shape cards stack, code
+     blocks and diagrams scroll sideways rather than the page.
+   - No interaction beyond links, `<details>` and the diagram clicks, plus a small
+     "hide noise" toggle on the file map. Nothing is stored.
 3. Publish it: `Artifact` with that `file_path`, `icon: "map"`, and a one-sentence
    `description` from **In short**. The page `<title>` is `Walkthrough · #<n>` or
    `Walkthrough · <branch>`. Republish to the same path when the user asks for changes.
 
-If there is no `Artifact` tool, write the same content as markdown to
-`walkthrough-<PR number or branch>.md` at the repo root instead. Don't commit it or add it to
-`.gitignore`; say the path in one line and that it's untracked.
+If there is no `Artifact` tool, say the walkthrough needs one and stop. Don't write a
+markdown file instead.
 
-The user asked for it on the PR as well: `gh pr comment <n> --body-file <markdown file>`.
-GitHub renders mermaid. Only when asked.
+If the user also asks for it on the PR, post a short comment with `gh pr comment <n>`
+holding the In short sentences, the hero diagram as a mermaid block (GitHub renders it) and
+the artifact link. Only post when asked.
 
-Reply with the artifact link (or the file path), the **In short** sentences, and the ASCII
-form of the diagram so the reader in a terminal sees the shape without opening the page.
-Don't repeat the document in chat.
+Reply with the artifact link, the **In short** sentences, and the hero diagram in ASCII
+(`-->` arrows, `[brackets]`, `*` on changed nodes) so a reader in a terminal sees the shape
+without opening the page. Don't repeat the page in chat.
