@@ -1,5 +1,22 @@
 # aj-log
 
+## 2026-11-04 — work-band: random port from a range
+
+- Why: the user wants the band to pick a random port from a range, say 1930-1980, and check
+  that it is free before using it.
+- `settings.ts`: a new `server.portRange` setting (`"1930-1980"`), with `parsePortRange`,
+  `portRange` (1930-1980 when unset or invalid) and `isRandomPort`. The settings pane has a
+  "Random port range" row.
+- `register.tsx`: at session start, a port picked with Change port still comes first. If
+  there is none and `portRange` is set, the band shuffles the range and takes the first port
+  `lsof` shows free, with no toast. Without a range it keeps the old behaviour, where a taken
+  port falls back to the range (now 1930-1980, was a hardcoded 1920-1990).
+  `candidatePorts` takes an optional preferred port and a range. `/wb settings` and
+  `/wb setup` ask for the range ("Off" clears it).
+- Tests: candidatePorts with no preferred port and with a custom range; a session with
+  `portRange` set lands on the free port; parsePortRange and portRange. 105 pass. The 10
+  that fail also failed before this change: those tests' `ui.ask` is never answered.
+
 ## 2026-10-17 — work-band works in any GitHub repo, with per-repo settings
 
 - `hooks/settings.ts` (new, pure): the settings file `~/.claude/work-band.json`, keyed by

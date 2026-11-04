@@ -6,7 +6,10 @@ import {
   issueKey,
   jiraSite,
   parseEnv,
+  parsePortRange,
   parsePorts,
+  portRange,
+  isRandomPort,
   parseSettingsFile,
   planArgv,
   ports,
@@ -95,6 +98,20 @@ test('the settings pane lists the server rows only when there is a server', () =
     'Server: turbo: npx turbo run serve --ui=stream',
     'Port variable: WEB_PORT',
     'Ports: 1776, 1791, 1792',
+    'Random port range: off (fallback 1930-1980)',
     'Extra env: ORCHESTRATOR_SINGLETON_GATE=false',
   ])
+})
+
+test('a port range is from-to inside 1-65535; unset or bad reads as 1930-1980 and off', () => {
+  expect(parsePortRange('1930-1980')).toEqual({ from: 1930, to: 1980 })
+  expect(parsePortRange(' 4000 - 4010 ')).toEqual({ from: 4000, to: 4010 })
+  expect(['1980-1930', '0-10', '1-70000', '1930', 'a-b', ''].map(parsePortRange)).toEqual([
+    undefined, undefined, undefined, undefined, undefined, undefined,
+  ])
+  expect(portRange({})).toEqual({ from: 1930, to: 1980 })
+  expect(isRandomPort({})).toBe(false)
+  expect(portRange({ server: { portRange: '4000-4010' } })).toEqual({ from: 4000, to: 4010 })
+  expect(isRandomPort({ server: { portRange: '4000-4010' } })).toBe(true)
+  expect(isRandomPort({ server: { portRange: 'nope' } })).toBe(false)
 })

@@ -49,7 +49,7 @@ export type ServerKind = 'turbo' | 'plain' | 'none'
 export type RepoSettings = {
   enabled?: boolean
   jira?: { site?: string; keyPattern?: string; projects?: string[] }
-  server?: { kind?: ServerKind; command?: string[]; portEnv?: string; ports?: number[]; env?: Record<string, string> }
+  server?: { kind?: ServerKind; command?: string[]; portEnv?: string; ports?: number[]; portRange?: string; env?: Record<string, string> }
 }
 
 declare module 'claude-code' {

@@ -78,6 +78,22 @@ export const ports = (s: RepoSettings): readonly number[] => {
   return list.length ? list : [3000]
 }
 
+// The range a random port is drawn from: `server.portRange` as `1930-1980`,
+// else 1930-1980. A range that does not parse reads as the default.
+export const DEFAULT_PORT_RANGE = { from: 1930, to: 1980 } as const
+export type PortRange = { from: number; to: number }
+export const parsePortRange = (text: string): PortRange | undefined => {
+  const m = /^\s*(\d+)\s*[-–]\s*(\d+)\s*$/.exec(text)
+  if (!m) return undefined
+  const from = Number(m[1])
+  const to = Number(m[2])
+  return from >= 1 && to <= 65535 && from <= to ? { from, to } : undefined
+}
+export const portRange = (s: RepoSettings): PortRange =>
+  (s.server?.portRange && parsePortRange(s.server.portRange)) || DEFAULT_PORT_RANGE
+// Set: every session starts on a random free port in the range.
+export const isRandomPort = (s: RepoSettings): boolean => !!s.server?.portRange && !!parsePortRange(s.server.portRange)
+
 // What a process of this server's command looks like in `ps`, to find one
 // this session started and lost track of.
 export const serverMatch = (s: RepoSettings): string => serverArgv(s).filter(a => !a.startsWith('-')).slice(1).join(' ')
@@ -137,6 +153,11 @@ export const describe = (s: RepoSettings): { key: string; label: string; value: 
       : [
           { key: 'server.portEnv', label: 'Port variable', value: portEnv(s) },
           { key: 'server.ports', label: 'Ports', value: ports(s).join(', ') },
+          {
+            key: 'server.portRange',
+            label: 'Random port range',
+            value: isRandomPort(s) ? `${portRange(s).from}-${portRange(s).to}` : `off (fallback ${portRange(s).from}-${portRange(s).to})`,
+          },
           { key: 'server.env', label: 'Extra env', value: Object.entries(s.server?.env ?? {}).map(([k, v]) => `${k}=${v}`).join(' ') || 'none' },
         ]),
   ]

@@ -165,7 +165,8 @@ cyan; every prompt you send carries a hidden line with that topic, so Claude re-
 
 Per repo, set in `~/.claude/work-band.json` (nothing is written to the repo), it also shows the
 Jira issue the branch names, only once you set the Jira site, and a button that starts or restarts
-the dev server: a turbo `serve` task or any command, with its port variable, ports and extra env.
+the dev server: a turbo `serve` task or any command, with its port variable, ports and extra env. Set a random port range (`"portRange": "1930-1980"`)
+and each session starts the server on a random port from it that nothing is listening on.
 `/wb settings` lists this repo's settings in a pane, where a click changes one; `/wb setup` asks
 each in turn and offers the servers it finds in `turbo.json` and `package.json`.
 

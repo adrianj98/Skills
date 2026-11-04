@@ -2,19 +2,24 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
 import type { Account, Check, CheckState, DiffStat, FilesMode, Jira, Pr, RepoSettings, Serve, Task } from '../types'
+import type { PortRange } from './settings'
 import {
   SETTINGS_FILE,
   describe,
   detectServers,
+  DEFAULT_PORT_RANGE,
   formatSettingsFile,
   isEnabled,
+  isRandomPort,
   issueKey,
   jiraSite,
   parseEnv,
+  parsePortRange,
   parsePorts,
   parseSettingsFile,
   planArgv,
   portEnv,
+  portRange,
   ports,
   repoOf,
   serverArgv,
@@ -327,17 +332,20 @@ export const parsePort = (text: string): number | undefined => {
   return text.trim() !== '' && Number.isInteger(n) && n >= 1 && n <= 65535 ? n : undefined
 }
 
-// The ports tried, in order, when the remembered one is taken: the remembered
-// one first, then 1920-1990 in a random order (`random` is Math.random; a
-// test passes its own).
-export const RANDOM_PORTS = { from: 1920, to: 1990 } as const
-export const candidatePorts = (preferred: number, random: () => number = Math.random): number[] => {
-  const pool = Array.from({ length: RANDOM_PORTS.to - RANDOM_PORTS.from + 1 }, (_, i) => RANDOM_PORTS.from + i)
+// The ports tried, in order: the preferred one first (when there is one),
+// then the range (`server.portRange`, 1930-1980 by default) in a random
+// order (`random` is Math.random; a test passes its own).
+export const candidatePorts = (
+  preferred: number | undefined,
+  random: () => number = Math.random,
+  range: PortRange = DEFAULT_PORT_RANGE,
+): number[] => {
+  const pool = Array.from({ length: range.to - range.from + 1 }, (_, i) => range.from + i)
   for (let i = pool.length - 1; i > 0; i--) {
     const j = Math.floor(random() * (i + 1))
     ;[pool[i], pool[j]] = [pool[j]!, pool[i]!]
   }
-  return [preferred, ...pool.filter(at => at !== preferred)]
+  return preferred === undefined ? pool : [preferred, ...pool.filter(at => at !== preferred)]
 }
 
 const taskName = (taskId: string) => taskId.replace(/^.*#/, '')
@@ -981,16 +989,16 @@ async function isPortTaken($: EngineInterface, at: number) {
   return exitCode === 0 && stdout.trim() !== ''
 }
 
-// At session start: keep the remembered port if it is free, else take a
-// random free one in 1920-1990 for this session (the remembered one stays stored).
-async function pickFreePort($: EngineInterface) {
-  const preferred = await read($, port)
-  for (const at of candidatePorts(preferred)) {
+// At session start: keep the preferred port if it is free, else take a
+// random free one from the range for this session (a remembered port stays
+// stored). With no preferred port (a random range set, nothing remembered)
+// the first free one in the range is taken, with no notice.
+async function pickFreePort($: EngineInterface, preferred: number | undefined) {
+  const range = portRange(await read($, settings))
+  for (const at of candidatePorts(preferred, Math.random, range)) {
     if (await isPortTaken($, at)) continue
-    if (at !== preferred) {
-      await update($, port, () => at)
-      $.ui.toast(`Port ${preferred} is in use; the server will use ${at}`)
-    }
+    if (at !== (await read($, port))) await update($, port, () => at)
+    if (preferred !== undefined && at !== preferred) $.ui.toast(`Port ${preferred} is in use; the server will use ${at}`)
     return
   }
 }
@@ -1111,7 +1119,7 @@ async function restartServe($: EngineInterface) {
 
 // ---------- settings: the pane, one question per setting, the wizard ----------
 const SETTINGS_PANE = 'wb-settings'
-const SETTING_KEYS = ['enabled', 'jira.site', 'jira.projects', 'server.kind', 'server.portEnv', 'server.ports', 'server.env'] as const
+const SETTING_KEYS = ['enabled', 'jira.site', 'jira.projects', 'server.kind', 'server.portEnv', 'server.ports', 'server.portRange', 'server.env'] as const
 type SettingKey = (typeof SETTING_KEYS)[number]
 
 const KEEP = 'Keep as is'
@@ -1205,6 +1213,27 @@ async function askSetting($: EngineInterface, key: SettingKey, cfg: RepoSettings
     next.server = { ...next.server, ports: list }
     return next
   }
+  if (key === 'server.portRange') {
+    const r = portRange(cfg)
+    const a = await ask(
+      'Start each session on a random free port from a range? Type it under Other (1930-1980), or Off to use the ports list.',
+      'port range',
+      ['Off', `${r.from}-${r.to}`],
+    )
+    if (a === undefined) return undefined
+    if (a === KEEP) return next
+    if (a === 'Off') {
+      if (next.server) delete next.server.portRange
+      return next
+    }
+    const range = parsePortRange(a)
+    if (!range) {
+      $.ui.toast(`"${a}" is not a port range (like 1930-1980)`)
+      return undefined
+    }
+    next.server = { ...next.server, portRange: `${range.from}-${range.to}` }
+    return next
+  }
   const current = Object.entries(cfg.server?.env ?? {}).map(([k, v]) => `${k}=${v}`).join(' ')
   const a = await ask('Extra environment for the server? Type it under Other (NAME=value OTHER=1), or None.', 'env', ['None', current])
   if (a === undefined) return undefined
@@ -1278,10 +1307,17 @@ async function activate($: EngineInterface) {
   ensurePolling($)
   const cfg = await read($, settings)
   if (serverKind(cfg) === 'none') return
+  // A port picked with Change port wins; else a random one from
+  // server.portRange when it is set; else the first configured port.
   const stored = await $.store.get(portKey(await read($, repo)))
-  const at = typeof stored === 'number' && parsePort(String(stored)) !== undefined ? stored : ports(cfg)[0]!
-  await update($, port, () => at)
-  if ((await read($, serve)).state !== 'running') void pickFreePort($).catch(() => {})
+  const remembered = typeof stored === 'number' && parsePort(String(stored)) !== undefined ? stored : undefined
+  const preferred = remembered ?? (isRandomPort(cfg) ? undefined : ports(cfg)[0]!)
+  if ((await read($, serve)).state === 'running') {
+    if (preferred !== undefined) await update($, port, () => preferred)
+    return
+  }
+  await update($, port, () => preferred ?? portRange(cfg).from)
+  void pickFreePort($, preferred).catch(() => {})
 }
 
 // /wb toggles the band, /wb settings lists this repo's settings in a pane,
