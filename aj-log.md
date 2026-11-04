@@ -1,5 +1,14 @@
 # aj-log
 
+## 2026-11-04 — walkthrough: code is always syntax highlighted (v0.3.1)
+
+- Why: the user asked for the walkthrough's code to use syntax highlighting.
+- `SKILL.md` §6: every code block uses highlight.js 11.9.0 from cdnjs. The language class
+  comes from the file extension, and the token colours come from the page's light and dark
+  tokens. The code is highlighted first, then wrapped per line, so the added-line tint and
+  callouts sit on top of the colours. Before │ after panels and diffs are highlighted too.
+  Version 0.3.1.
+
 ## 2026-11-04 — walkthrough: always an artifact, as visual as possible (v0.3.0)
 
 - Why: the user wants the walkthrough as a Claude artifact, not a markdown file, and as

@@ -209,7 +209,7 @@
       "displayName": "Walkthrough",
       "source": "./plugins/walkthrough",
       "description": "A highly visual code walkthrough, always published as an artifact: a clickable diagram of the path the change takes, a file map with +/- bars, then 3\u20138 short stops each with a locator, a diagram or before/after panel, annotated code, a file:line and why. Defaults to the PR branch; also takes a description that focuses the tour or picks the code to tour.",
-      "version": "0.3.0",
+      "version": "0.3.1",
       "author": {
         "name": "Adrian Jones",
         "url": "https://github.com/adrianj98"

@@ -139,7 +139,7 @@ claude plugin install greenlight@adrianj98-skills
 
 [Full README →](plugins/greenlight/README.md)
 
-### [`walkthrough`](plugins/walkthrough) · v0.3.0
+### [`walkthrough`](plugins/walkthrough) · v0.3.1
 
 `/walkthrough` — a tour of a change that shows before it tells, always published as an
 artifact page: a clickable diagram of the path the change takes, a file map with +/− bars,

@@ -164,7 +164,7 @@ In this order:
      link to GitHub at the head **sha**
      (`https://github.com/<owner>/<repo>/blob/<headRefOid>/<path>#L84-L112`), else plain text.
    - Locator chips, then the stop's visual(s) from §4.
-   - The code: 5–15 lines as they are after the change, elided with `// …`, added lines
+   - The code, syntax highlighted: 5–15 lines as they are after the change, elided with `// …`, added lines
      tinted, callouts on the lines that matter.
    - One to three sentences: what it does in terms of behaviour, then why, taken from the
      description, a commit message or the surrounding code. If nothing says why, write "the
@@ -202,8 +202,18 @@ document pasted in chat.
      with `securityLevel: 'loose'` and `theme: 'base'`, its `themeVariables` taken from the
      page's colour tokens so the diagrams match the page in light and dark. Re-render when
      the colour scheme changes. Keep each diagram's source in a `<pre class="mermaid">`.
-   - Syntax highlighting from cdnjs (highlight.js or Prism at an exact version). Tint and
-     callouts are spans you add around the lines, not images.
+   - **Every code block is syntax highlighted**, no plain monochrome code. Use highlight.js
+     from cdnjs at an exact version (`highlight.js/11.9.0/highlight.min.js`). Give each
+     block its language class (`language-ts`, `language-go`, `language-sql`, `language-diff`)
+     taken from the file's extension, never left to auto-detect. Load the language files
+     the core build lacks, also from cdnjs.
+   - Colour the tokens from the page's own tokens (keyword, string, number, comment, type,
+     function, punctuation) with a light and a dark set, so highlighting follows the
+     colour scheme. Don't load a fixed-theme stylesheet that ignores dark mode.
+   - Highlight first, then add the per-line wrappers: split the highlighted HTML into lines,
+     wrap each one in a `<span class="line">` carrying the line number, the added or removed
+     tint and any callout badge. Tint is a background, so the token colours still show
+     through. Before │ after panels and diff blocks are highlighted the same way.
    - Colour tokens on `:root`: background, surface, text, muted, accent (changed), added
      (green), removed (red), warn (amber), and one colour per file tag. A dark variant
      under `prefers-color-scheme: dark`, an explicit `body` background.
