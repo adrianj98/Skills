@@ -54,7 +54,7 @@ export type RepoSettings = {
 
 declare module 'claude-code' {
   interface PluginState {
-    'work-band': { pr: Pr | null; jira: Jira | null; serve: Serve; canServe: boolean; isHidden: boolean; logView: { task: string; tick: number }; mergedTold: number[]
+    'work-band': { pr: Pr | null; jira: Jira | null; serve: Serve; canServe: boolean; isHidden: boolean; answered: boolean; logView: { task: string; tick: number }; mergedTold: number[]
       port: number
       filesMode: FilesMode
       openDirs: string[]

@@ -35,6 +35,10 @@ const jira = atom({ plugin: 'work-band', key: 'jira' } as const, null)
 const serve = atom({ plugin: 'work-band', key: 'serve' } as const, { state: 'stopped', tasks: [] })
 const canServe = atom({ plugin: 'work-band', key: 'canServe' } as const, false)
 const isHidden = atom({ plugin: 'work-band', key: 'isHidden' } as const, false)
+// Whether git has named this session's remote. Kept in session state, not in
+// the module, so an in-app /resume (which swaps in the resumed conversation's
+// state, canServe false, and fires no session.start) checks the repo again.
+const answered = atom({ plugin: 'work-band', key: 'answered' } as const, false)
 // The port the server runs on: the repo's first configured port, or the one
 // last chosen for this repo (remembered across sessions in $.store).
 const port = atom({ plugin: 'work-band', key: 'port' } as const, 3000)
@@ -726,7 +730,7 @@ async function changeJiraStatus($: EngineInterface) {
 async function checkRepo($: EngineInterface): Promise<boolean> {
   const { exitCode, stdout } = await $.process.run(['git', 'remote', 'get-url', 'origin'])
   if (exitCode !== 0) return read($, canServe)
-  answered = true
+  await update($, answered, () => true)
   const name = repoOf(stdout) ?? ''
   await update($, repo, () => name)
   const cfg = name ? await loadSettings($, name) : {}
@@ -773,26 +777,25 @@ async function saveSettings($: EngineInterface, cfg: RepoSettings) {
 }
 
 // Whether the band is on in this session. Once git has named the remote,
-// that answer stands: another repo is never checked again. Only while git
-// has not answered (the check failed) does a hook try again, at most every
-// RECHECK_MS and MAX_RETRIES times in all, and a match switches the band on
-// then and there. A hot reload
-// forgets `answered`, so another repo is checked once more after one.
+// that answer stands for this conversation: another repo is never checked
+// again. Only while git has not answered (the check failed, or a /resume
+// brought in a conversation with no answer) does a hook try again, at most
+// every RECHECK_MS and MAX_RETRIES times in all, and a match switches the
+// band on then and there.
 const RECHECK_MS = 30_000
 const MAX_RETRIES = 5
-let answered = false
 let lastCheck = Number.NEGATIVE_INFINITY
 let checking: Promise<boolean> | null = null
 let failedChecks = 0
 async function isOn($: EngineInterface): Promise<boolean> {
   if (await read($, canServe)) return true
-  if (answered || failedChecks >= MAX_RETRIES) return false
+  if ((await read($, answered)) || failedChecks >= MAX_RETRIES) return false
   const now = await $.clock.now()
   if (now - lastCheck < RECHECK_MS) return false
   lastCheck = now
   checking ??= checkRepo($)
     .then(async ok => {
-      if (!answered) failedChecks += 1
+      if (!(await read($, answered))) failedChecks += 1
       if (ok) await activate($)
       return ok
     })
@@ -1333,18 +1336,18 @@ export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     const started = await next(e)
     lastCheck = await $.clock.now()
-    answered = false
+    await update($, answered, () => false)
     failedChecks = 0
     if (await checkRepo($)) await activate($)
     else if (await read($, repo)) await registerCommand($)
-    else if (!answered) {
+    else if (!(await read($, answered))) {
       // git failed: try again until it answers, at most MAX_RETRIES times,
       // since outside a git repo it never will
       let tries = 0
       const retry = $.clock.every(RECHECK_MS, () =>
         void isOn($)
-          .then(() => {
-            if (answered || ++tries >= MAX_RETRIES) retry.cancel()
+          .then(async () => {
+            if ((await read($, answered)) || ++tries >= MAX_RETRIES) retry.cancel()
           })
           .catch(() => {}),
       )

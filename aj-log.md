@@ -1,5 +1,24 @@
 # aj-log
 
+## 2026-11-05 — work-band: the band comes back after an in-app /resume (v0.2.1)
+
+- Why: the user saw the band missing in some alertd-core worktrees (e.g.
+  feature-AL-4911-pg-connections). Each of those sessions had been switched to an older
+  conversation with `/resume` inside a running Claude. That swaps in the resumed
+  conversation's plugin state (`canServe` false) and fires no `session.start`. The
+  module-level `answered = true` from the startup check survived the switch, so `isOn()`
+  never checked the repo again: no band, `set_topic` unanswered, and `/wb` said "off for
+  this repo". Reproduced in tmux: fresh session (band on) → `/resume <id>` → band gone.
+- `hooks/register.tsx`: `answered` is now a session-state atom instead of a module
+  variable, so it resets with `canServe` on `/resume`. The next prompt, turn or tool call
+  checks the repo and turns the band back on. `types/index.d.ts` declares the new key.
+- Verified live: after `/resume`, `set_topic` returns "The band shows: after fix" and the
+  band draws again. The test kit can't simulate `/resume` (it refuses state writes from a
+  test's hooks), so there is no unit test for it. The suite has the same 10 failures as
+  before this change, all in the server and settings tests.
+- Reinstalled the mod (`./install.sh work-band --global`): `~/.claude/mods/work-band` was
+  an Oct 17 copy.
+
 ## 2026-11-04 — walkthrough: code is always syntax highlighted (v0.3.1)
 
 - Why: the user asked for the walkthrough's code to use syntax highlighting.
