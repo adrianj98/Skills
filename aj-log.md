@@ -1,5 +1,15 @@
 # aj-log
 
+## 2026-11-09 — diag: download the full diag first (v0.1.1)
+
+- Why: the user wants `/diag` to try the full diagnostics download before anything else.
+- `SKILL.md` §3: step 1 is now `fs download` with no `--since`, into
+  `~/.alertd/diag/<alias>/<timestamp>/`, unpacked and searched locally. It runs in the
+  background while `health`, `ingest status`, `schedules` and `fs summary` run. Live log tails
+  are only the fallback when the download fails (403, timeout, build limit), and the report
+  says why.
+- README updated, and the version bumped to 0.1.1.
+
 ## 2026-11-09 — diag: new `/diag` skill (v0.1.0)
 
 - Why: the user wants `/diag <name>` to pull an AlertD server's diagnostics with

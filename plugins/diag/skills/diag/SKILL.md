@@ -55,19 +55,27 @@ Never print tokens or the raw `servers.json`.
 
 ## 3. Pull the diag
 
-Start broad, then narrow, all with `--server <alias>`:
+Everything uses `--server <alias>`.
 
-1. `health`, `ingest status`, `schedules --events 2`, `fs summary`
-2. `fs ls logs`, then `fs tail logs/server.log --offset -60000 --text` (the newest log
-   files that `fs ls` shows, not a guessed name)
-3. For more than tails can hold, pull the whole archive and search it locally:
+1. **Download the full diag first.** Pull the whole `data/` archive, with no `--since`, and
+   unpack it:
 
    ```bash
-   mkdir -p ~/.alertd/diag/<alias>/ && ad --server <alias> fs download --since 6h --out ~/.alertd/diag/<alias>/
+   d=~/.alertd/diag/<alias>/$(date +%Y%m%d-%H%M%S)/ && mkdir -p "$d" && ad --server <alias> fs download --out "$d" && tar -xzf "$d"/*.tar.gz -C "$d"
    ```
 
-   Unpack it next to itself. Building it takes minutes on a big deployment, so start it only
-   when the live reads don't settle the question. Say where the archive landed.
+   It takes minutes on a big deployment, so run it in the background and tell the user
+   it's building. While it builds, run `health`, `ingest status`, `schedules --events 2` and
+   `fs summary`. Search the unpacked archive with Grep and Read, not with more API calls.
+   Say where it landed.
+2. **Only if the download fails** (a 403, a timeout, or the server's two-builds limit), fall
+   back to live reads:
+   - `fs ls logs`
+   - `fs tail <log> --offset -60000 --text` on the newest log files that `fs ls` shows, not
+     a guessed name
+   - `fs cat` for small files
+
+   Say the download failed and why.
 
 Everything is read-only. Never call `api POST`, an `mcp call` that changes state, or any
 route that writes, unless the user asks for that exact action.
