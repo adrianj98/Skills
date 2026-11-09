@@ -1,5 +1,19 @@
 # aj-log
 
+## 2026-11-09 — diag: preliminary report while the full diag downloads (v0.1.3)
+
+- Why: the user wants the download to run in the background while the agent writes a
+  preliminary report.
+- `SKILL.md` §3:
+  1. Start the full download with `run_in_background`.
+  2. Read the live server and post a **Preliminary** report without waiting.
+  3. When the archive lands, confirm, correct or drop each preliminary finding against it,
+     and post the final report saying what changed.
+  4. If the download fails, finish from live reads.
+
+  The duplicated fallback list is folded into step 4.
+- README updated, and the version bumped to 0.1.3.
+
 ## 2026-11-09 — diag: the report shows its evidence (v0.1.2)
 
 - Why: the user wants `/diag` to finish with evidence: logs and the like.

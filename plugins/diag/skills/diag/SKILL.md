@@ -64,18 +64,23 @@ Everything uses `--server <alias>`.
    d=~/.alertd/diag/<alias>/$(date +%Y%m%d-%H%M%S)/ && mkdir -p "$d" && ad --server <alias> fs download --out "$d" && tar -xzf "$d"/*.tar.gz -C "$d"
    ```
 
-   It takes minutes on a big deployment, so run it in the background and tell the user
-   it's building. While it builds, run `health`, `ingest status`, `schedules --events 2` and
-   `fs summary`. Search the unpacked archive with Grep and Read, not with more API calls.
-   Say where it landed.
-2. **Only if the download fails** (a 403, a timeout, or the server's two-builds limit), fall
-   back to live reads:
-   - `fs ls logs`
-   - `fs tail <log> --offset -60000 --text` on the newest log files that `fs ls` shows, not
-     a guessed name
-   - `fs cat` for small files
+   It takes minutes on a big deployment, so run it with `run_in_background` and don't wait
+   for it.
+2. **Preliminary report while it builds.** Read the live server:
+   - `health`, `ingest status`, `schedules --events 2`, `fs summary`
+   - `fs ls logs`, then `fs tail <log> --offset -60000 --text` on the newest log files that
+     `fs ls` shows, not a guessed name
 
-   Say the download failed and why.
+   Then post a report headed **Preliminary**, in the §5 format, built from those reads only,
+   and say the full diag is still downloading. Don't wait for the download before posting it.
+3. **Final report when the download lands.** Unpack it, then search the whole archive with
+   Grep and Read, not more API calls. Check every preliminary finding against it: confirm it
+   with the fuller evidence, correct it, or drop it. Look for what the tails were too short
+   to show: the first occurrence, older errors and other log files. Post the final report and
+   name what changed since the preliminary one. Say where the diag landed.
+4. **If the download fails** (a 403, a timeout, or the server's two-builds limit), finish
+   from live reads instead. Add more `fs tail`s at earlier offsets and `fs cat` for small
+   files. Say the download failed and why.
 
 Everything is read-only. Never call `api POST`, an `mcp call` that changes state, or any
 route that writes, unless the user asks for that exact action.

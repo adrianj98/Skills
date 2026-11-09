@@ -112,7 +112,7 @@ claude plugin install doubt@adrianj98-skills
 
 [Full README →](plugins/doubt/README.md)
 
-### [`diag`](plugins/diag) · v0.1.2
+### [`diag`](plugins/diag) · v0.1.3
 
 `/diag <name>` — pull an AlertD server's diagnostics with alertd-core's `npm run alertd-server`
 and say what is wrong with it. Give a name's URL once and it is remembered, so `/diag ltk` is
