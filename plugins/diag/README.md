@@ -9,7 +9,8 @@
 - **Full diag first, in the background.** It starts downloading the whole `data/` archive into
   `~/.alertd/diag/<name>/<time>/`. While that builds, it reads the live server (health, ingest,
   schedules, log tails) and posts a **Preliminary** report. When the archive lands, it searches
-  all of it and posts the final report, saying what changed. If the download fails, it
+  all of it. If the conclusion is the same, it just says so in one line. Otherwise it posts a
+  final report that starts with what changed. If the download fails, it
   finishes from live reads and says why.
 - **Only a name → a diagnosis.** From that, it reports **Healthy**, **Degraded** or **Down**
   with up to five findings. Each one shows its evidence: the real log lines in a code block,

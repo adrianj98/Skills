@@ -76,8 +76,13 @@ Everything uses `--server <alias>`.
 3. **Final report when the download lands.** Unpack it, then search the whole archive with
    Grep and Read, not more API calls. Check every preliminary finding against it: confirm it
    with the fuller evidence, correct it, or drop it. Look for what the tails were too short
-   to show: the first occurrence, older errors and other log files. Post the final report and
-   name what changed since the preliminary one. Say where the diag landed.
+   to show: the first occurrence, older errors and other log files.
+   - **Same conclusion** (same verdict, same findings, nothing added or dropped): don't write
+     a second report. Say in one line that the full diag reaches the same conclusion, plus
+     where the diag landed. Add a short line only for evidence the full diag sharpened, such
+     as the true first occurrence.
+   - **Different conclusion:** post the final report, start it with what changed since the
+     preliminary one, and say where the diag landed.
 4. **If the download fails** (a 403, a timeout, or the server's two-builds limit), finish
    from live reads instead. Add more `fs tail`s at earlier offsets and `fs cat` for small
    files. Say the download failed and why.

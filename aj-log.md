@@ -1,5 +1,14 @@
 # aj-log
 
+## 2026-11-09 — diag: no second report when the full diag agrees (v0.1.4)
+
+- Why: the user wants no repeat report when the full diag reaches the preliminary
+  conclusion.
+- `SKILL.md` §3 step 3: if the verdict and findings are the same, it says so in one line, plus
+  the diag's path and any sharpened evidence such as the true first occurrence. Only a
+  different conclusion gets a full final report, which starts with what changed.
+- README updated, and the version bumped to 0.1.4.
+
 ## 2026-11-09 — diag: preliminary report while the full diag downloads (v0.1.3)
 
 - Why: the user wants the download to run in the background while the agent writes a
