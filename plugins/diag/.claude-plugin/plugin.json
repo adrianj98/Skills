@@ -1,0 +1,10 @@
+{
+  "name": "diag",
+  "displayName": "Diag",
+  "version": "0.1.0",
+  "description": "Pulls an AlertD server's diagnostics by its short name with alertd-core's npm run alertd-server, remembers each name's URL after the first time, and with only a name works out what is wrong from the diagnostics alone.",
+  "author": { "name": "Adrian Jones", "url": "https://github.com/adrianj98" },
+  "repository": "https://github.com/adrianj98/skills",
+  "license": "MIT",
+  "keywords": ["alertd", "diagnostics", "debugging", "ops", "logs"]
+}

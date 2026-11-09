@@ -1,0 +1,14 @@
+# What ../../install.sh copies when someone installs this plugin without the plugin system.
+# Verbs are documented in ../adversarial-review/install.manifest.
+
+name   Diag
+about  Pulls an AlertD server's diagnostics by short name and says what is wrong with it.
+
+file   skills/diag/SKILL.md  skills/diag/SKILL.md  /diag
+
+# Outside the plugin system there is no /plugin:skill namespace.
+rewrite  /diag:diag  /diag
+
+tip  /diag ltk https://ltk.example.com   first time: logs in and remembers ltk
+tip  /diag ltk                           after that: what is wrong with ltk, from the diag alone
+tip  /diag rsqa ingest lag               aim the diag at one question

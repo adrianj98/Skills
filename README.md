@@ -112,6 +112,19 @@ claude plugin install doubt@adrianj98-skills
 
 [Full README →](plugins/doubt/README.md)
 
+### [`diag`](plugins/diag) · v0.1.0
+
+`/diag <name>` — pull an AlertD server's diagnostics with alertd-core's `npm run alertd-server`
+and say what is wrong with it. Give a name's URL once and it is remembered, so `/diag ltk` is
+enough after that. With only a name, it works out the problem from the diagnostics alone and
+starts the report with **Healthy**, **Degraded** or **Down**. It is read-only.
+
+```bash
+claude plugin install diag@adrianj98-skills
+```
+
+[Full README →](plugins/diag/README.md)
+
 ### [`caveman`](plugins/caveman) · v0.1.0
 
 `/caveman` — short, plain replies for the rest of the session, with no pleasantries, hedging

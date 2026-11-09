@@ -1,5 +1,24 @@
 # aj-log
 
+## 2026-11-09 — diag: new `/diag` skill (v0.1.0)
+
+- Why: the user wants `/diag <name>` to pull an AlertD server's diagnostics with
+  `npm run alertd-server`, remember what each short name (e.g. `ltk`) points to after the
+  first time, and with only a name, work out what is wrong from the diagnostics alone.
+- New plugin `plugins/diag`: `skills/diag/SKILL.md`, `plugin.json`, `install.manifest`,
+  `README.md`, plus marketplace and root README entries.
+- Names: no new registry. The CLI already keeps aliases in `~/.alertd/servers.json`, so a new
+  name is logged in with `login <url> --alias <name>` (asking for the URL once) and is known
+  from then on.
+- The script exists only in alertd-core, so the skill uses the current repo when it has the
+  script, else a `~/projects/alertd-core.git` worktree (`develop` first). The build prints
+  noise before the JSON, which the `ad` helper strips. Tested from this repo:
+  `servers` and `--server develop health` returned clean JSON.
+- Only a name: health → ingest → schedules → fs summary → newest log tails, and the
+  `data/` archive (`fs download --since 6h`) into `~/.alertd/diag/<alias>/` when needed. The
+  report starts with Healthy, Degraded or Down. Read-only.
+- Installed globally with `./install.sh diag --global`.
+
 ## 2026-11-05 — work-band: the band comes back after an in-app /resume (v0.2.1)
 
 - Why: the user saw the band missing in some alertd-core worktrees (e.g.
