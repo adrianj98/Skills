@@ -101,11 +101,31 @@ With a question, aim the same reads at it.
 ## 5. Report
 
 Start with one line: **Healthy**, **Degraded** or **Down**, plus the main reason. Then up
-to five findings, worst first. For each one give:
+to five findings, worst first. Every finding carries its evidence. A claim with no evidence
+under it is left out:
 
-- what is wrong
-- the evidence: the command, file and timestamp, with a short quoted log line
-- since when
+````markdown
+### 1. <what is wrong> — since <first timestamp>
 
-End with what wasn't checked (a 403 means the signed-in user lacks admin, not that the
-server is broken) and the archive's path, if one was pulled. Keep it short.
+<one or two sentences: what it means for the server>
+
+**Evidence**
+- `<archive path or command>:<line>`: 412 matches from 09:14 to 11:02 (first · last)
+```log
+<the real log lines, copied exactly: the first occurrence, plus any stack trace or cause line>
+```
+- `ingest status`: `"source": "s3-prod", "lastSuccess": "…", "lastError": "…"`
+````
+
+- **Logs:** copy the real lines in a fenced `log` block, never paraphrased. Include the
+  timestamp, the archive path (relative to the unpacked dir) and the line number. Give 1–5
+  lines, plus the line above or below when it shows the cause.
+- **Counts and time:** how many times it happened, the first and last time, and whether it is
+  still happening.
+- **API output:** quote the exact JSON fields that show it, and name the command.
+- **Chains:** when one error causes another, show both, cause first.
+
+End with:
+- **Not checked:** what couldn't be read, and why. A 403 means the signed-in user lacks
+  admin, not that the server is broken.
+- **Diag:** the archive's path and the unpacked folder, so the user can open the evidence.

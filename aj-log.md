@@ -1,5 +1,14 @@
 # aj-log
 
+## 2026-11-09 — diag: the report shows its evidence (v0.1.2)
+
+- Why: the user wants `/diag` to finish with evidence: logs and the like.
+- `SKILL.md` §5: every finding has an **Evidence** block. It quotes the real log lines in a
+  fenced `log` block with the archive path, line number and timestamp, gives the count and the
+  first and last time, quotes the exact API fields, and shows cause before effect. A claim
+  with no evidence is dropped. The report ends with what wasn't checked and the diag's path.
+- README updated, and the version bumped to 0.1.2.
+
 ## 2026-11-09 — diag: download the full diag first (v0.1.1)
 
 - Why: the user wants `/diag` to try the full diagnostics download before anything else.
