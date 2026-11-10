@@ -168,7 +168,7 @@ claude plugin install walkthrough@adrianj98-skills
 
 [Full README →](plugins/walkthrough/README.md)
 
-### [`work-band`](plugins/work-band) · v0.2.0
+### [`work-band`](plugins/work-band) · v0.2.2
 
 A mod, not a skill: a hooks module that draws a band above the prompt in any GitHub repo. It shows
 the checked-out branch, its PR and checks, and the lines added and removed against the PR's base
@@ -181,6 +181,8 @@ Per repo, set in `~/.claude/work-band.json` (nothing is written to the repo), it
 Jira issue the branch names, only once you set the Jira site, and a button that starts or restarts
 the dev server: a turbo `serve` task or any command, with its port variable, ports and extra env. Set a random port range (`"portRange": "1930-1980"`)
 and each session starts the server on a random port from it that nothing is listening on.
+Random ports come only from that setting. Without it, a busy port moves to the next free one in
+the ports list, and if all of them are busy the band says so.
 `/wb settings` lists this repo's settings in a pane, where a click changes one; `/wb setup` asks
 each in turn and offers the servers it finds in `turbo.json` and `package.json`.
 

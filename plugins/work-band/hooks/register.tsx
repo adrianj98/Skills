@@ -7,7 +7,7 @@ import {
   SETTINGS_FILE,
   describe,
   detectServers,
-  DEFAULT_PORT_RANGE,
+  SUGGESTED_PORT_RANGE,
   formatSettingsFile,
   isEnabled,
   isRandomPort,
@@ -337,13 +337,16 @@ export const parsePort = (text: string): number | undefined => {
 }
 
 // The ports tried, in order: the preferred one first (when there is one),
-// then the range (`server.portRange`, 1930-1980 by default) in a random
-// order (`random` is Math.random; a test passes its own).
+// then, with `server.portRange` set, the range in a random order (`random` is
+// Math.random; a test passes its own). With no range set there is nothing
+// random: the rest of the configured ports list, in its order.
 export const candidatePorts = (
   preferred: number | undefined,
   random: () => number = Math.random,
-  range: PortRange = DEFAULT_PORT_RANGE,
+  range?: PortRange,
+  list: readonly number[] = [],
 ): number[] => {
+  if (!range) return [...new Set([...(preferred === undefined ? [] : [preferred]), ...list])]
   const pool = Array.from({ length: range.to - range.from + 1 }, (_, i) => range.from + i)
   for (let i = pool.length - 1; i > 0; i--) {
     const j = Math.floor(random() * (i + 1))
@@ -992,18 +995,23 @@ async function isPortTaken($: EngineInterface, at: number) {
   return exitCode === 0 && stdout.trim() !== ''
 }
 
-// At session start: keep the preferred port if it is free, else take a
-// random free one from the range for this session (a remembered port stays
-// stored). With no preferred port (a random range set, nothing remembered)
-// the first free one in the range is taken, with no notice.
+// At session start: keep the preferred port if it is free, else move to the
+// next free one for this session (a remembered port stays stored): a random
+// one from `server.portRange` when it is set, else the next in the ports
+// list. With no preferred port (a range set, nothing remembered) the first
+// free one in the range is taken, with no notice. When every one is taken
+// the port stays as it is and a toast says so.
 async function pickFreePort($: EngineInterface, preferred: number | undefined) {
-  const range = portRange(await read($, settings))
-  for (const at of candidatePorts(preferred, Math.random, range)) {
+  const cfg = await read($, settings)
+  const candidates = candidatePorts(preferred, Math.random, portRange(cfg), ports(cfg))
+  for (const at of candidates) {
     if (await isPortTaken($, at)) continue
     if (at !== (await read($, port))) await update($, port, () => at)
     if (preferred !== undefined && at !== preferred) $.ui.toast(`Port ${preferred} is in use; the server will use ${at}`)
     return
   }
+  if (preferred !== undefined)
+    $.ui.toast(`Ports ${candidates.join(', ')} are all in use; /wb settings can add ports or a random range`)
 }
 
 async function choosePort($: EngineInterface) {
@@ -1217,7 +1225,7 @@ async function askSetting($: EngineInterface, key: SettingKey, cfg: RepoSettings
     return next
   }
   if (key === 'server.portRange') {
-    const r = portRange(cfg)
+    const r = portRange(cfg) ?? SUGGESTED_PORT_RANGE
     const a = await ask(
       'Start each session on a random free port from a range? Type it under Other (1930-1980), or Off to use the ports list.',
       'port range',
@@ -1319,7 +1327,7 @@ async function activate($: EngineInterface) {
     if (preferred !== undefined) await update($, port, () => preferred)
     return
   }
-  await update($, port, () => preferred ?? portRange(cfg).from)
+  await update($, port, () => preferred ?? portRange(cfg)?.from ?? ports(cfg)[0]!)
   void pickFreePort($, preferred).catch(() => {})
 }
 

@@ -78,9 +78,10 @@ export const ports = (s: RepoSettings): readonly number[] => {
   return list.length ? list : [3000]
 }
 
-// The range a random port is drawn from: `server.portRange` as `1930-1980`,
-// else 1930-1980. A range that does not parse reads as the default.
-export const DEFAULT_PORT_RANGE = { from: 1930, to: 1980 } as const
+// The range a random port is drawn from: `server.portRange` as `1930-1980`.
+// Random ports come only from this setting: unset (or not parsing), there is
+// no range and the server sticks to the ports list.
+export const SUGGESTED_PORT_RANGE = { from: 1930, to: 1980 } as const
 export type PortRange = { from: number; to: number }
 export const parsePortRange = (text: string): PortRange | undefined => {
   const m = /^\s*(\d+)\s*[-–]\s*(\d+)\s*$/.exec(text)
@@ -89,10 +90,10 @@ export const parsePortRange = (text: string): PortRange | undefined => {
   const to = Number(m[2])
   return from >= 1 && to <= 65535 && from <= to ? { from, to } : undefined
 }
-export const portRange = (s: RepoSettings): PortRange =>
-  (s.server?.portRange && parsePortRange(s.server.portRange)) || DEFAULT_PORT_RANGE
+export const portRange = (s: RepoSettings): PortRange | undefined =>
+  s.server?.portRange ? parsePortRange(s.server.portRange) : undefined
 // Set: every session starts on a random free port in the range.
-export const isRandomPort = (s: RepoSettings): boolean => !!s.server?.portRange && !!parsePortRange(s.server.portRange)
+export const isRandomPort = (s: RepoSettings): boolean => portRange(s) !== undefined
 
 // What a process of this server's command looks like in `ps`, to find one
 // this session started and lost track of.
@@ -156,7 +157,7 @@ export const describe = (s: RepoSettings): { key: string; label: string; value: 
           {
             key: 'server.portRange',
             label: 'Random port range',
-            value: isRandomPort(s) ? `${portRange(s).from}-${portRange(s).to}` : `off (fallback ${portRange(s).from}-${portRange(s).to})`,
+            value: (r => (r ? `${r.from}-${r.to}` : 'off'))(portRange(s)),
           },
           { key: 'server.env', label: 'Extra env', value: Object.entries(s.server?.env ?? {}).map(([k, v]) => `${k}=${v}`).join(' ') || 'none' },
         ]),

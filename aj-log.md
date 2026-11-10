@@ -1,5 +1,21 @@
 # aj-log
 
+## 2026-11-10 — work-band: no random port unless the config sets a range (v0.2.2)
+
+- Why: the user wants the band never to fall back to a random port. Random has to be
+  part of the config (`server.portRange`).
+- `hooks/settings.ts`: `portRange()` is `undefined` unless `server.portRange` is set and
+  parses. The built-in 1930-1980 default is gone, and `SUGGESTED_PORT_RANGE` only fills
+  the setup prompt. The settings pane shows `off` instead of `off (fallback 1930-1980)`.
+- `hooks/register.tsx`: `candidatePorts` with no range is the preferred port, then the
+  configured `ports` list in order, with nothing shuffled. If every one is busy, the port stays
+  and a toast says so (`/wb settings` can add ports or a range). With a range set, the behavior
+  is the same as before.
+- Tests: new tests cover the no-range candidates, a busy port moving to the next one in the
+  list (1776 → 1791), and every port busy. The range tests now pass their range explicitly.
+  107 pass. The 10 server and settings test failures are the same as before this change.
+- Root README updated, the version bumped to 0.2.2, and the mod reinstalled.
+
 ## 2026-11-09 — diag: no second report when the full diag agrees (v0.1.4)
 
 - Why: the user wants no repeat report when the full diag reaches the preliminary
