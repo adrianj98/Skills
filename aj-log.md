@@ -1,5 +1,25 @@
 # aj-log
 
+## 2026-11-10 — work-band: one ports list of ports and ranges (v0.2.3)
+
+- Why: the user asked why there are two port settings, and wants one, like
+  `1988, 3000, 1943-1960`.
+- `hooks/settings.ts`:
+  - `server.ports` holds single ports and `"from-to"` ranges, as an array
+    (`[1988, 3000, "1943-1960"]`) or a string.
+  - New `portEntries`, `firstPort` and `formatPorts`. `parsePorts` takes ranges.
+  - The separate `server.portRange` setting is gone from the pane and setup. An old one still
+    reads as a range at the front of the list, and saving the ports list folds it in.
+- `hooks/register.tsx`:
+  - `candidatePorts(preferred, entries, random)` tries the preferred port, then the entries in
+    order, each range shuffled.
+  - The session starts on the first entry, or a random free port when that entry is a range.
+  - The toast for every port being busy shows the list.
+- Tests: the candidate tests cover a mixed list. The settings tests cover parsing, the legacy
+  `portRange` and formatting. The setup test answers `5173, 5174, 4100-4120`. 106 pass. The 10
+  server and settings test failures are the same as before this change.
+- README updated, the version bumped to 0.2.3, and the mod reinstalled.
+
 ## 2026-11-10 — work-band: no random port unless the config sets a range (v0.2.2)
 
 - Why: the user wants the band never to fall back to a random port. Random has to be

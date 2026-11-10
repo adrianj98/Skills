@@ -8,8 +8,9 @@ import {
   parseEnv,
   parsePortRange,
   parsePorts,
-  portRange,
-  isRandomPort,
+  firstPort,
+  formatPorts,
+  portEntries,
   parseSettingsFile,
   planArgv,
   ports,
@@ -98,21 +99,26 @@ test('the settings pane lists the server rows only when there is a server', () =
     'Server: turbo: npx turbo run serve --ui=stream',
     'Port variable: WEB_PORT',
     'Ports: 1776, 1791, 1792',
-    'Random port range: off',
     'Extra env: ORCHESTRATOR_SINGLETON_GATE=false',
   ])
 })
 
-test('a port range is from-to inside 1-65535; unset or bad is no range and off', () => {
+test('ports: one list of single ports and ranges (from-to inside 1-65535), in order', () => {
   expect(parsePortRange('1930-1980')).toEqual({ from: 1930, to: 1980 })
   expect(parsePortRange(' 4000 - 4010 ')).toEqual({ from: 4000, to: 4010 })
   expect(['1980-1930', '0-10', '1-70000', '1930', 'a-b', ''].map(parsePortRange)).toEqual([
     undefined, undefined, undefined, undefined, undefined, undefined,
   ])
-  expect(portRange({})).toBeUndefined()
-  expect(portRange({ server: { portRange: 'nope' } })).toBeUndefined()
-  expect(isRandomPort({})).toBe(false)
-  expect(portRange({ server: { portRange: '4000-4010' } })).toEqual({ from: 4000, to: 4010 })
-  expect(isRandomPort({ server: { portRange: '4000-4010' } })).toBe(true)
-  expect(isRandomPort({ server: { portRange: 'nope' } })).toBe(false)
+  // One ports list: single ports and ranges, in order.
+  expect(portEntries({})).toEqual([3000])
+  expect(portEntries({ server: { ports: [1988, 3000, '1943-1960'] } })).toEqual([1988, 3000, { from: 1943, to: 1960 }])
+  expect(portEntries({ server: { ports: '1988, 3000, 1943-1960' } })).toEqual([1988, 3000, { from: 1943, to: 1960 }])
+  expect(portEntries({ server: { ports: [1988, 'nope', '1980-1930'] } })).toEqual([1988])
+  // An old portRange reads as a range at the front.
+  expect(portEntries({ server: { ports: [5173], portRange: '4000-4010' } })).toEqual([{ from: 4000, to: 4010 }, 5173])
+  expect(firstPort({ server: { ports: [1988, '1943-1960'] } })).toBe(1988)
+  expect(firstPort({ server: { ports: ['1943-1960', 1988] } })).toBeUndefined()
+  expect(formatPorts(portEntries({ server: { ports: [1988, 3000, '1943-1960'] } }))).toBe('1988, 3000, 1943-1960')
+  expect(parsePorts('1988, 3000 1943-1960')).toEqual([1988, 3000, '1943-1960'])
+  expect(parsePorts('1988, nope')).toBeUndefined()
 })

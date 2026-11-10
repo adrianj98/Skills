@@ -73,16 +73,12 @@ export const planArgv = (s: RepoSettings): readonly string[] | undefined => {
 }
 
 export const portEnv = (s: RepoSettings): string => s.server?.portEnv?.trim() || 'PORT'
-export const ports = (s: RepoSettings): readonly number[] => {
-  const list = (s.server?.ports ?? []).filter(p => Number.isInteger(p) && p > 0 && p < 65536)
-  return list.length ? list : [3000]
-}
-
-// The range a random port is drawn from: `server.portRange` as `1930-1980`.
-// Random ports come only from this setting: unset (or not parsing), there is
-// no range and the server sticks to the ports list.
-export const SUGGESTED_PORT_RANGE = { from: 1930, to: 1980 } as const
+// `server.ports`: one list of single ports and ranges, tried in its order,
+// e.g. `[1988, 3000, "1943-1960"]` (typed as `1988, 3000, 1943-1960`). A range
+// stands for any free port in it, taken at random; random ports come from
+// nowhere else. An old `server.portRange` reads as a range at the front.
 export type PortRange = { from: number; to: number }
+export type PortEntry = number | PortRange
 export const parsePortRange = (text: string): PortRange | undefined => {
   const m = /^\s*(\d+)\s*[-–]\s*(\d+)\s*$/.exec(text)
   if (!m) return undefined
@@ -90,10 +86,30 @@ export const parsePortRange = (text: string): PortRange | undefined => {
   const to = Number(m[2])
   return from >= 1 && to <= 65535 && from <= to ? { from, to } : undefined
 }
-export const portRange = (s: RepoSettings): PortRange | undefined =>
-  s.server?.portRange ? parsePortRange(s.server.portRange) : undefined
-// Set: every session starts on a random free port in the range.
-export const isRandomPort = (s: RepoSettings): boolean => portRange(s) !== undefined
+const isPort = (n: number) => Number.isInteger(n) && n > 0 && n < 65536
+const entryOf = (raw: unknown): PortEntry | undefined => {
+  if (typeof raw === 'number') return isPort(raw) ? raw : undefined
+  if (typeof raw !== 'string') return undefined
+  return /^\s*\d+\s*$/.test(raw) && isPort(Number(raw)) ? Number(raw) : parsePortRange(raw)
+}
+export const portEntries = (s: RepoSettings): readonly PortEntry[] => {
+  const raw = s.server?.ports
+  const items: unknown[] = typeof raw === 'string' ? raw.split(/[\s,]+/).filter(Boolean) : Array.isArray(raw) ? raw : []
+  const list = [...(s.server?.portRange ? [s.server.portRange] : []), ...items]
+    .map(entryOf)
+    .filter((e): e is PortEntry => e !== undefined)
+  return list.length ? list : [3000]
+}
+// The single ports in the list, for the Change port menu.
+export const ports = (s: RepoSettings): readonly number[] => portEntries(s).filter((e): e is number => typeof e === 'number')
+// The port a session starts on: the first entry when it is a single port;
+// undefined when it is a range (a random free one from it).
+export const firstPort = (s: RepoSettings): number | undefined => {
+  const first = portEntries(s)[0]
+  return typeof first === 'number' ? first : undefined
+}
+const entryText = (e: PortEntry) => (typeof e === 'number' ? String(e) : `${e.from}-${e.to}`)
+export const formatPorts = (list: readonly PortEntry[]): string => list.map(entryText).join(', ')
 
 // What a process of this server's command looks like in `ps`, to find one
 // this session started and lost track of.
@@ -127,11 +143,12 @@ export const detectServers = (turboJson: string | undefined, packageJson: string
   return out
 }
 
-// `1776, 1791 1792` → [1776, 1791, 1792]; undefined when any part is not a port.
-export const parsePorts = (text: string): number[] | undefined => {
-  const parts = text.split(/[\s,]+/).filter(Boolean)
-  const list = parts.map(Number)
-  return parts.length && list.every(p => Number.isInteger(p) && p > 0 && p < 65536) ? list : undefined
+// `1988, 3000 1943-1960` → [1988, 3000, '1943-1960'], as `server.ports` keeps
+// it; undefined when any part is neither a port nor a range.
+export const parsePorts = (text: string): (number | string)[] | undefined => {
+  const entries = text.split(/[\s,]+/).filter(Boolean).map(entryOf)
+  if (!entries.length || entries.some(e => e === undefined)) return undefined
+  return (entries as PortEntry[]).map(e => (typeof e === 'number' ? e : entryText(e)))
 }
 
 // `A=1 B=two` → { A: '1', B: 'two' }; undefined when a part has no `=`.
@@ -153,12 +170,7 @@ export const describe = (s: RepoSettings): { key: string; label: string; value: 
       ? []
       : [
           { key: 'server.portEnv', label: 'Port variable', value: portEnv(s) },
-          { key: 'server.ports', label: 'Ports', value: ports(s).join(', ') },
-          {
-            key: 'server.portRange',
-            label: 'Random port range',
-            value: (r => (r ? `${r.from}-${r.to}` : 'off'))(portRange(s)),
-          },
+          { key: 'server.ports', label: 'Ports', value: formatPorts(portEntries(s)) },
           { key: 'server.env', label: 'Extra env', value: Object.entries(s.server?.env ?? {}).map(([k, v]) => `${k}=${v}`).join(' ') || 'none' },
         ]),
   ]

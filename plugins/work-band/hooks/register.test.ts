@@ -1233,40 +1233,28 @@ for (const surface of ['terminal', 'desktop'] as const) {
   })
 }
 
-test('ports tried with no range set: the preferred one, then the ports list, nothing random', () => {
-  expect(candidatePorts(1776)).toEqual([1776])
-  expect(candidatePorts(1776, () => 0.5, undefined, [1776, 1791, 1792])).toEqual([1776, 1791, 1792])
-  expect(candidatePorts(1791, () => 0.5, undefined, [1776, 1791])).toEqual([1791, 1776])
-  expect(candidatePorts(undefined, () => 0.5, undefined, [5173])).toEqual([5173])
-})
-
-test('ports tried with a range set: the preferred one, then the range in a random order', () => {
-  const all = Array.from({ length: 51 }, (_, i) => 1930 + i)
-  const R = { from: 1930, to: 1980 }
-  const ports = candidatePorts(1776, Math.random, R)
-  expect(ports[0]).toBe(1776)
-  expect([...ports.slice(1)].sort((a, b) => a - b)).toEqual(all)
+test('ports tried: the preferred one, then the list in order, with nothing random but a range it names', () => {
+  expect(candidatePorts(1776, [1776, 1791, 1792], () => 0.5)).toEqual([1776, 1791, 1792])
+  expect(candidatePorts(1791, [1776, 1791], () => 0.5)).toEqual([1791, 1776])
+  expect(candidatePorts(undefined, [5173])).toEqual([5173])
+  // A range is its ports in a random order, in its place in the list.
+  const mixed = candidatePorts(1988, [1988, 3000, { from: 1943, to: 1960 }])
+  expect(mixed.slice(0, 2)).toEqual([1988, 3000])
+  expect([...mixed.slice(2)].sort((a, b) => a - b)).toEqual(Array.from({ length: 18 }, (_, i) => 1943 + i))
   // A preferred port inside the range is not tried twice.
-  const inRange = candidatePorts(1950, Math.random, R)
+  const R = { from: 1930, to: 1980 }
+  const inRange = candidatePorts(1950, [R])
   expect(inRange[0]).toBe(1950)
-  expect(inRange.length).toBe(51)
   expect(new Set(inRange).size).toBe(51)
-  // No preferred port: just the range, shuffled.
-  expect([...candidatePorts(undefined, Math.random, R)].sort((a, b) => a - b)).toEqual(all)
-  // Another range.
-  expect([...candidatePorts(undefined, Math.random, { from: 4000, to: 4002 })].sort()).toEqual([4000, 4001, 4002])
-  // The order follows the random source: a different source, a different order.
+  // The order follows the random source.
   let seed = 7
   const lcg = () => ((seed = (seed * 48271) % 2147483647) / 2147483647)
-  const a = candidatePorts(1776, lcg, R)
-  const b = candidatePorts(1776, () => 0, R)
-  expect(a).not.toEqual(b)
-  expect(b.slice(1)).not.toEqual(all)
+  expect(candidatePorts(undefined, [R], lcg)).not.toEqual(candidatePorts(undefined, [R], () => 0))
 })
 
-test('with server.portRange set, the session starts on a random free port in it, with no notice', async ($, on) => {
+test('with a range first in server.ports, the session starts on a random free port in it, with no notice', async ($, on) => {
   const base = ALERTD_SETTINGS['alert-d/alertd-core']
-  useSettings({ 'alert-d/alertd-core': { ...base, server: { ...base.server, portRange: '4000-4003' } } })
+  useSettings({ 'alert-d/alertd-core': { ...base, server: { ...base.server, ports: ['4000-4003'] } } })
   const taken = new Set(['4000', '4001', '4002'])
   const toasts: string[] = []
   on('ui.toast', (_$, e) => {
@@ -1302,7 +1290,7 @@ test('a taken port at session start moves the server to the next free port in th
   expect(store.has('port:alert-d/alertd-core')).toBe(false)
 })
 
-test('every configured port taken and no range set: the port stays, a toast says so, nothing random', async ($, on) => {
+test('every listed port taken: the port stays, a toast says so, nothing random', async ($, on) => {
   const toasts: string[] = []
   on('ui.toast', (_$, e) => {
     toasts.push(e.text)
@@ -1313,7 +1301,7 @@ test('every configured port taken and no range set: the port stays, a toast says
   )
   const band = await mountBand($, 'terminal')
   expect((await band.find({ key: 'port' }))?.text).toBe(':1776')
-  expect(toasts).toEqual(['Ports 1776, 1791, 1792 are all in use; /wb settings can add ports or a random range'])
+  expect(toasts).toEqual(['Ports 1776, 1791, 1792 are all in use; /wb settings can add more'])
 })
 
 test('a free remembered port is kept, with no notice', async ($, on) => {
@@ -1528,7 +1516,7 @@ for (const surface of ['terminal', 'desktop'] as const) {
 
 test('/wb setup asks each setting in turn, offers the servers it finds, and saves once', async ($, on) => {
   useSettings({})
-  const asked = answering(on, ['On', 'acme.atlassian.net', 'Any', 'npm run dev', 'PORT', '5173, 5174', '4100-4120', 'None'])
+  const asked = answering(on, ['On', 'acme.atlassian.net', 'Any', 'npm run dev', 'PORT', '5173, 5174, 4100-4120', 'None'])
   const clock = mock.clock(on)
   await startIn($, on, 'git@github.com:someone/web.git', '', clock, false, new Map(), argv =>
     argv[0] === 'git' && argv.includes('--show-toplevel') ? '/repo\n' : undefined,
@@ -1543,14 +1531,13 @@ test('/wb setup asks each setting in turn, offers the servers it finds, and save
     'Which dev server should the band run',
     'Which environment variable does the server read its port from',
     'Which ports may the server use, first choice first',
-    'Start each session on a random free port from a range',
     'Extra environment for the server',
   ])
   expect(asked[3]!.options).toEqual(['None', 'npm run dev'])
   expect(savedSettings()).toEqual({
     'someone/web': {
       jira: { site: 'acme.atlassian.net' },
-      server: { kind: 'plain', command: ['npm', 'run', 'dev'], portEnv: 'PORT', ports: [5173, 5174], portRange: '4100-4120' },
+      server: { kind: 'plain', command: ['npm', 'run', 'dev'], portEnv: 'PORT', ports: [5173, 5174, '4100-4120'] },
     },
   })
 })
