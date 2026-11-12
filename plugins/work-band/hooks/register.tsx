@@ -39,13 +39,15 @@ const isHidden = atom({ plugin: 'work-band', key: 'isHidden' } as const, false)
 // state, canServe false, and fires no session.start) checks the repo again.
 const answered = atom({ plugin: 'work-band', key: 'answered' } as const, false)
 // The port the server runs on: the repo's first configured port, or the one
-// last chosen for this repo (remembered across sessions in $.store).
+// last chosen in this worktree (remembered across sessions in $.store).
 const port = atom({ plugin: 'work-band', key: 'port' } as const, 3000)
 // `owner/repo`, this repo's settings and its default branch.
 const repo = atom({ plugin: 'work-band', key: 'repo' } as const, '')
 const settings = atom({ plugin: 'work-band', key: 'settings' } as const, {} as RepoSettings)
 const defaultBranch = atom({ plugin: 'work-band', key: 'defaultBranch' } as const, '')
-const portKey = (r: string) => `port:${r}`
+// A chosen port is remembered per worktree, under its top folder: the
+// worktrees of one repo run their servers side by side, each on its own port.
+const portKey = (top: string) => `port:${top}`
 // What Claude says it is working on now: one to three short labels it sets
 // through the set_topic tool; empty until it does.
 const topic = atom({ plugin: 'work-band', key: 'topic' } as const, [] as string[])
@@ -486,6 +488,13 @@ let prChanges: Change[] = []
 let uncommitted: Change[] = []
 const editing = new Map<string, number>() // path → how many edits are in flight
 let spinTimer: { cancel: () => void } | null = null
+
+// This worktree's top folder; empty when git cannot say.
+async function worktreeTop($: EngineInterface): Promise<string> {
+  const top = await $.process.run(['git', 'rev-parse', '--show-toplevel'])
+  if (top.exitCode === 0) repoTop = top.stdout.trim()
+  return repoTop
+}
 
 async function refreshFiles($: EngineInterface) {
   const top = await $.process.run(['git', 'rev-parse', '--show-toplevel'])
@@ -1032,7 +1041,8 @@ async function choosePort($: EngineInterface) {
     return
   }
   await update($, port, () => chosen)
-  await $.store.set(portKey(await read($, repo)), chosen)
+  const top = repoTop || (await worktreeTop($))
+  if (top) await $.store.set(portKey(top), chosen)
   if ((await read($, serve)).state === 'running') await restartServe($)
 }
 
@@ -1293,9 +1303,7 @@ async function activate($: EngineInterface) {
     })
     .catch(() => {})
   void refreshAccount($).catch(() => {})
-  void $.process.run(['git', 'rev-parse', '--show-toplevel']).then(r => {
-    if (r.exitCode === 0) repoTop = r.stdout.trim()
-  })
+  const top = worktreeTop($)
   void $.process.run(['gh', 'repo', 'view', '--json', 'defaultBranchRef', '-q', '.defaultBranchRef.name']).then(async r => {
     if (r.exitCode === 0 && r.stdout.trim()) await update($, defaultBranch, () => r.stdout.trim())
   })
@@ -1303,9 +1311,10 @@ async function activate($: EngineInterface) {
   ensurePolling($)
   const cfg = await read($, settings)
   if (serverKind(cfg) === 'none') return
-  // A port picked with Change port wins; else the first entry of
-  // server.ports, or a random free one when that entry is a range.
-  const stored = await $.store.get(portKey(await read($, repo)))
+  // A port picked with Change port in this worktree wins; else the first
+  // entry of server.ports, or a random free one when that entry is a range.
+  const at = await top
+  const stored = at ? await $.store.get(portKey(at)) : undefined
   const remembered = typeof stored === 'number' && parsePort(String(stored)) !== undefined ? stored : undefined
   const preferred = remembered ?? firstPort(cfg)
   if ((await read($, serve)).state === 'running') {

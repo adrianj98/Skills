@@ -166,7 +166,7 @@
       "displayName": "Work band",
       "source": "./plugins/work-band",
       "description": "A band above the prompt in any GitHub repo: the branch, the PR and its checks, the changed files, and per repo, set in ~/.claude/work-band.json with /wb settings or /wb setup, the Jira issue and a dev-server button.",
-      "version": "0.2.3",
+      "version": "0.2.4",
       "author": {
         "name": "Adrian Jones",
         "url": "https://github.com/adrianj98"

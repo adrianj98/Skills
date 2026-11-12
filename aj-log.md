@@ -1,5 +1,21 @@
 # aj-log
 
+## 2026-11-12 — work-band: a chosen port is remembered per worktree (v0.2.4)
+
+- Why: every worktree of `alertd-core.git` started on 1999 instead of a random port from the
+  configured range. A port picked once with Change port was stored under `port:<owner/repo>`,
+  which all worktrees of a repo share, and a stored port wins over `server.ports`. The user:
+  it should be per worktree; per repo makes no sense.
+- `hooks/register.tsx`: the store key is `port:<worktree top folder>` (from
+  `git rev-parse --show-toplevel`, new `worktreeTop`). Session start waits for that folder
+  before reading the stored port; with no folder nothing is read or stored. The old
+  `port:<owner/repo>` keys are no longer read.
+- `hooks/register.test.ts`: the test git answers `--show-toplevel` with `/work/alertd-core`;
+  the port tests use the new key; a new test checks that another worktree's port and an old
+  per-repo key are both ignored.
+- README sentence, the version bumped to 0.2.4, and the mod reinstalled. The stale
+  `port:alert-d/alertd-core` (1999) was removed from the store file.
+
 ## 2026-11-10 — work-band: one ports list of ports and ranges (v0.2.3)
 
 - Why: the user asked why there are two port settings, and wants one, like

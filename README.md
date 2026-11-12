@@ -168,7 +168,7 @@ claude plugin install walkthrough@adrianj98-skills
 
 [Full README →](plugins/walkthrough/README.md)
 
-### [`work-band`](plugins/work-band) · v0.2.3
+### [`work-band`](plugins/work-band) · v0.2.4
 
 A mod, not a skill: a hooks module that draws a band above the prompt in any GitHub repo. It shows
 the checked-out branch, its PR and checks, and the lines added and removed against the PR's base
@@ -183,7 +183,8 @@ the dev server: a turbo `serve` task or any command, with its port variable, por
 `ports` is one list of single ports and ranges, tried in order (`"ports": [1988, 3000, "1943-1960"]`,
 typed `1988, 3000, 1943-1960` in `/wb settings`). A busy port moves on to the next one, and a range
 means any free port in it, picked at random. Random ports come from nowhere else. If every port is
-busy, the band says so.
+busy, the band says so. A port picked with **Change port** is remembered for that worktree only,
+so the worktrees of one repo each keep their own.
 `/wb settings` lists this repo's settings in a pane, where a click changes one; `/wb setup` asks
 each in turn and offers the servers it finds in `turbo.json` and `package.json`.
 

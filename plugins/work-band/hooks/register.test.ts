@@ -67,6 +67,8 @@ export const ALERTD_SETTINGS = {
 const SETTINGS_PATH = '/home/t/.claude/work-band.json'
 const files = new Map<string, string>()
 let nextSettings: object | undefined
+// The worktree the session is in, as `git rev-parse --show-toplevel` gives it.
+const worktree = '/work/alertd-core'
 const useSettings = (all: object) => {
   nextSettings = all
 }
@@ -81,7 +83,14 @@ const startIn = async ($: Engine, on: On, origin: string, prJson: string | (() =
   on('process.run', (_$, e) => {
     ran.push(e.argv)
     const given = git?.(e.argv)
-    const out = given !== undefined ? given : e.argv[0] === 'gh' && e.argv[1] === 'repo' && e.argv[2] === 'view' ? 'develop\n' : undefined
+    const out =
+      given !== undefined
+        ? given
+        : e.argv[0] === 'gh' && e.argv[1] === 'repo' && e.argv[2] === 'view'
+          ? 'develop\n'
+          : e.argv[0] === 'git' && e.argv.includes('--show-toplevel')
+            ? `${worktree}\n`
+            : undefined
     if (out === null) return { value: { exitCode: 1, stdout: '', stderr: 'fatal', isStdoutTruncated: false, isStderrTruncated: false } }
     if (out !== undefined) {
       return { value: { exitCode: 0, stdout: out, stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
@@ -891,7 +900,7 @@ for (const surface of ['terminal', 'desktop'] as const) {
     await ui.press({ key: 'menu' })
 
     expect(ports).toEqual(['1776', '1791'])
-    expect(store.get('port:alert-d/alertd-core')).toBe(1791)
+    expect(store.get('port:/work/alertd-core')).toBe(1791)
     expect(await ui.find({ type: 'Text', text: /:1791/ })).toBeDefined()
   })
 }
@@ -902,10 +911,26 @@ test('a remembered port is used from the start of the next session', async ($, o
     ports.push(e.env?.WEB_PORT)
     return { value: { code: 0, signal: null } }
   })
-  await startIn($, on, 'git@github.com:alert-d/alertd-core.git', '', mock.clock(on), false, new Map([['port:alert-d/alertd-core', 1792]]))
+  await startIn($, on, 'git@github.com:alert-d/alertd-core.git', '', mock.clock(on), false, new Map([['port:/work/alertd-core', 1792]]))
   const ui = await mountBand($, 'terminal')
   await ui.press({ key: 'serve' })
   expect(ports).toEqual(['1792'])
+})
+
+test("a port remembered in another worktree of the repo is not this worktree's", async ($, on) => {
+  const ports: (string | undefined)[] = []
+  on('process.spawn', async function* (_$, e) {
+    ports.push(e.env?.WEB_PORT)
+    return { value: { code: 0, signal: null } }
+  })
+  const store = new Map<string, unknown>([
+    ['port:/work/alertd-core-other', 1792],
+    ['port:alert-d/alertd-core', 1999], // the per-repo key of 0.2.3 and before
+  ])
+  await startIn($, on, 'git@github.com:alert-d/alertd-core.git', '', mock.clock(on), false, store)
+  const ui = await mountBand($, 'terminal')
+  await ui.press({ key: 'serve' })
+  expect(ports).toEqual(['1776'])
 })
 
 // A repo of five files: two changed in the PR, one of them and one new
@@ -1138,7 +1163,7 @@ for (const surface of ['terminal', 'desktop'] as const) {
   test(`${surface}: the port opens the server in Chrome's existing tab, else plain open`, async ($, on) => {
     const ran: string[][] = []
     let chromeWorks = true
-    const store = new Map<string, unknown>([['port:alert-d/alertd-core', 1791]])
+    const store = new Map<string, unknown>([['port:/work/alertd-core', 1791]])
     await startIn($, on, 'git@github.com:alert-d/alertd-core.git', '', mock.clock(on), false, store, argv => {
       if (argv[0] === 'osascript' || argv[0] === 'open') {
         ran.push([...argv])
@@ -1287,7 +1312,7 @@ test('a taken port at session start moves the server to the next free port in th
   const band = await mountBand($, 'terminal')
   expect((await band.find({ key: 'port' }))?.text).toBe(':1791')
   expect(toasts).toEqual(['Port 1776 is in use; the server will use 1791'])
-  expect(store.has('port:alert-d/alertd-core')).toBe(false)
+  expect(store.has('port:/work/alertd-core')).toBe(false)
 })
 
 test('every listed port taken: the port stays, a toast says so, nothing random', async ($, on) => {
@@ -1310,7 +1335,7 @@ test('a free remembered port is kept, with no notice', async ($, on) => {
     toasts.push(e.text)
     return { value: undefined } as never
   })
-  await startIn($, on, 'git@github.com:alert-d/alertd-core.git', '', mock.clock(on), false, new Map([['port:alert-d/alertd-core', 1791]]))
+  await startIn($, on, 'git@github.com:alert-d/alertd-core.git', '', mock.clock(on), false, new Map([['port:/work/alertd-core', 1791]]))
   const band = await mountBand($, 'terminal')
   expect((await band.find({ key: 'port' }))?.text).toBe(':1791')
   expect(toasts).toEqual([])
