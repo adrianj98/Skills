@@ -639,3 +639,13 @@
   the `Artifact` tool; the markdown file at the repo root is the fallback when there is no
   Artifact tool. `allowed-tools` gains Artifact and Skill. README, plugin README, descriptions.
   Why: asked for it to create an artifact.
+- `plugins/whyslow/`: new `/whyslow` plugin, v0.1.0. `scripts/snapshot.sh` takes a read-only
+  ~12s snapshot (sampled `top`, memory pressure/swap/compressor, memory grouped by process
+  name, disk space and `iostat`, `pmset` thermal/power, known background hogs, process
+  pile-ups, launch agents, recent hang reports; Linux fallback). `SKILL.md` runs it, rates
+  each bottleneck clear/strained/problem with thresholds, follows symptom chains to the cause
+  (swap thrash looks like CPU + `kernel_task` + disk), and reports Healthy/Strained/Overloaded
+  with why, fix and what was fine. Never kills or changes anything. Added to marketplace,
+  `plugins/index`, root README.
+  Why: asked for a skill that figures out why the machine is slow by running scripts first,
+  then diagnosing.

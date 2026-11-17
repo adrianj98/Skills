@@ -249,6 +249,28 @@
         "logs"
       ],
       "category": "development"
+    },
+    {
+      "name": "whyslow",
+      "displayName": "Why Slow",
+      "source": "./plugins/whyslow",
+      "description": "Works out why this computer is slow: runs a read-only snapshot script, then diagnoses from the numbers and names the culprit and the fix.",
+      "version": "0.1.0",
+      "author": {
+        "name": "Adrian Jones",
+        "url": "https://github.com/adrianj98"
+      },
+      "repository": "https://github.com/adrianj98/skills",
+      "license": "MIT",
+      "keywords": [
+        "performance",
+        "macos",
+        "diagnostics",
+        "memory",
+        "swap",
+        "cpu"
+      ],
+      "category": "productivity"
     }
   ]
 }

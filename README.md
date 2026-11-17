@@ -125,6 +125,19 @@ claude plugin install diag@adrianj98-skills
 
 [Full README →](plugins/diag/README.md)
 
+### [`whyslow`](plugins/whyslow) · v0.1.0
+
+`/whyslow` — work out why this computer is running slow. It runs a read-only snapshot script
+first (sampled CPU, memory pressure and swap, disk, thermal, background hogs, process
+pile-ups), then diagnoses from the numbers, following symptoms back to the cause. The report
+starts with **Healthy**, **Strained** or **Overloaded**, then why, the fix and what was fine.
+
+```bash
+claude plugin install whyslow@adrianj98-skills
+```
+
+[Full README →](plugins/whyslow/README.md)
+
 ### [`caveman`](plugins/caveman) · v0.1.0
 
 `/caveman` — short, plain replies for the rest of the session, with no pleasantries, hedging
