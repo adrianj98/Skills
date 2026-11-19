@@ -649,3 +649,18 @@
   `plugins/index`, root README.
   Why: asked for a skill that figures out why the machine is slow by running scripts first,
   then diagnosing.
+
+## 2026-11-19 — greenlight starts alertd-core's merge gate (v0.6.0)
+
+- `plugins/greenlight/skills/greenlight/SKILL.md` step 4 rewritten. alertd-core has no
+  `pull_request` trigger on integration.yml or playwright.yml; they run on a PR only through
+  `gated.yml` ("Merge gate (re-run to start)"), whose jobs need `github.run_attempt > 1`. The
+  required checks are `integration / integration` and `playwright / playwright`, and before the
+  gate is re-run they are unreported, not `skipping`, so the old "rerun a skipped integration
+  check" step never fired. Now: find the gate run on the head sha with
+  `gh run list --workflow gated.yml --commit`, `gh run rerun` it when attempt is 1 (not
+  `--failed`), confirm both required names appear; dispatch `gh workflow run gated.yml` when
+  there is no PR; old behaviour kept for repos without `gated.yml`. Step 6 now loops back to
+  step 4, because every push resets the gate. Step 0's plan and example table, step 7's pass
+  rule, description, READMEs, marketplace and plugin.json updated; version 0.5.0 → 0.6.0.
+  Why: asked to match alertd-core's workflows.

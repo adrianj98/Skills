@@ -150,13 +150,14 @@ claude plugin install caveman@adrianj98-skills
 
 [Full README →](plugins/caveman/README.md)
 
-### [`greenlight`](plugins/greenlight) · v0.5.0
+### [`greenlight`](plugins/greenlight) · v0.6.0
 
 `/greenlight`: a skill with no script behind it. It first says what it will do and lists the
 workflows it will watch, each with its checks and which are required. Then it pulls the default branch (asking GitHub
 which one that is), merges it into your branch, and pushes. If the merge conflicts, Claude
-resolves it. If the pull request has a required `integration` check that came out
-`skipping`, Claude reruns that run once. When a check fails, Claude fixes the code and
+resolves it. Then it starts alertd-core's merge gate: it re-runs the `Merge gate (re-run to start)`
+run (`gated.yml`), the only way `integration / integration` and `playwright / playwright`
+run on a pull request, and again after every push. When a check fails, Claude fixes the code and
 pushes again, up to three times. It then reports each check's result from `gh pr checks`.
 
 ```bash
