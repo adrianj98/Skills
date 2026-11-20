@@ -1,0 +1,16 @@
+# What ../../install.sh copies when someone installs this plugin without the plugin system.
+# Verbs are documented in ../adversarial-review/install.manifest.
+
+name   Mutants
+about  Mutation-tests a module, prunes zero-kill tests and strengthens weak assertions against the survivors.
+
+file   skills/mutants/SKILL.md  skills/mutants/SKILL.md      /mutants
+file   scripts/summarize.py     skills/mutants/summarize.py  summarizes a Stryker JSON report
+
+# Outside the plugin system there is no ${CLAUDE_PLUGIN_ROOT} and no /plugin:skill namespace.
+rewrite  ${CLAUDE_PLUGIN_ROOT}/scripts/summarize.py  @ROOT@/skills/mutants/summarize.py
+rewrite  /mutants:mutants                            /mutants
+
+tip  /mutants                    source files changed on this branch
+tip  /mutants src/utils/retry.ts one module
+tip  /mutants all                every module, one at a time

@@ -271,6 +271,21 @@
         "cpu"
       ],
       "category": "productivity"
+    },
+    {
+      "name": "mutants",
+      "displayName": "Mutants",
+      "source": "./plugins/mutants",
+      "description": "Mutation-tests a JS/TS module with Stryker, then deletes the zero-kill tests that are safe to drop and strengthens weak assertions until they kill the surviving mutants, proving each change with a rerun.",
+      "version": "0.1.0",
+      "author": {
+        "name": "Adrian Jones",
+        "url": "https://github.com/adrianj98"
+      },
+      "repository": "https://github.com/adrianj98/skills",
+      "license": "MIT",
+      "keywords": ["testing", "mutation-testing", "stryker", "test-quality"],
+      "category": "development"
     }
   ]
 }

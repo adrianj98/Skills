@@ -138,6 +138,19 @@ claude plugin install whyslow@adrianj98-skills
 
 [Full README →](plugins/whyslow/README.md)
 
+### [`mutants`](plugins/mutants) · v0.1.0
+
+`/mutants` — mutation-test a JS/TS module with Stryker, then fix the tests from the result:
+delete zero-kill tests that are safe to drop, merge duplicates, tighten weak assertions and add
+cases until the surviving mutants die, and rerun to prove nothing that was caught now slips
+through. It changes tests only, never the source.
+
+```bash
+claude plugin install mutants@adrianj98-skills
+```
+
+[Full README →](plugins/mutants/README.md)
+
 ### [`caveman`](plugins/caveman) · v0.1.0
 
 `/caveman` — short, plain replies for the rest of the session, with no pleasantries, hedging

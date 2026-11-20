@@ -664,3 +664,16 @@
   step 4, because every push resets the gate. Step 0's plan and example table, step 7's pass
   rule, description, READMEs, marketplace and plugin.json updated; version 0.5.0 → 0.6.0.
   Why: asked to match alertd-core's workflows.
+
+## 2026-11-20 — new `mutants` plugin (v0.1.0)
+
+- `plugins/mutants/`: `/mutants` runs Stryker module by module with `coverageAnalysis perTest`,
+  `scripts/summarize.py` reduces the JSON report to survivors and zero-kill tests, then the skill
+  prunes zero-kill tests (only under three safety rules), consolidates duplicates, strengthens
+  assertions against survivors (or marks them equivalent / reports a source bug), and reruns
+  Stryker to prove no previously killed mutant survives. Tests only, never source. One commit per
+  step, reverted if tests fail. Added to marketplace, `plugins/index`, root README.
+  Why: asked for a skill that runs a mutation tester, feeds survivors to Claude, and prunes and
+  strengthens tests. JS/TS only (asked to drop Python/mutmut). Took one-file-at-a-time, commit per
+  step, ~one test per code path, and the assertion anti-pattern list from SDiamante13's
+  refactor-tests skill (credited in the plugin README).
