@@ -1,5 +1,20 @@
 # aj-log
 
+## 2026-11-22 — deslop: the scan knows Kotlin (v0.2.0)
+
+- Why: run over a native Android app (15k lines of Kotlin), the scan flagged one line. Its rows
+  matched TypeScript, Python, Go, Rust, Java and Ruby forms and only the generic ones fired.
+- `scan.sh` rows gained Kotlin forms. type-escape: postfix `!!` (JS's `!!` is prefix, so it
+  can't fire there), `@Suppress(`. swallowed-error: `catch (e: X) { null }` and kin,
+  `runCatching { … }.getOrNull()`, an empty `.onFailure {}`. defensive-fallback: `?:` to an
+  empty collection, `""`, `0` or `false`. log-noise: `Log.v/d/i(`, `Timber.v/d/i(`, a bare
+  `println(`. stdlib-reimpl: `fun` / `val` declarations. Tools list adds `detekt`, `ktlint`;
+  with `.kt` in scope and a `gradlew`, it points at the compiler's `w:` lines for unused
+  params. SKILL.md says the same, and that a symbol grep must count string templates.
+- Tested on that app: 1 candidate before, 32 after (the `!!`-free codebase's `@Suppress`
+  idiom ×5, `runCatching{}.getOrNull()` ×4, `?: ""` ×15 …). On its TypeScript web app the
+  per-category counts are identical before and after.
+
 ## 2026-11-22 — skills carry their own scripts, so copying a skill folder works (v0.1.1 ×5)
 
 - Why: a cloud environment's setup script installs these skills with

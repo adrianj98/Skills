@@ -166,13 +166,13 @@ cat > "$PATTERNS" <<'EOF'
 comment-noise	code	-	(^|[[:space:]])(//|#|--|;;)[[:space:]]*(Step [0-9]|Initialize |Increment |Decrement |Loop (through|over)|Iterate |Check if |Now (we|that)|First,|Next,|Then,|Finally,|Helper (function|method)|Utility (function|method)|Main logic|Constants|Imports|Set (the|up the)|Get the|Create (a|an|the) new|Return (the|a)|Define the|Handle the|Process the|Validate the|Update the|Add (a|an|the)|Remove the|Convert the|Extract the)
 comment-banner	code	-	(//|#|/\*)[[:space:]]*[-=*_~]{4,}|(//|#)[[:space:]]*(SECTION|CONSTANTS|HELPERS|TYPES|EXPORTS|MAIN|UTILITIES|IMPORTS)[[:space:]]*(=|-)*[[:space:]]*$
 docstring-restates	code	-	(@param[[:space:]]+(\{[^}]*\}[[:space:]]*)?[A-Za-z_]+[[:space:]]+-?[[:space:]]*[Tt]he [A-Za-z_ ]+\.?$|:param [a-z_]+:[[:space:]]*[Tt]he [A-Za-z_ ]+\.?$|@returns?[[:space:]]+(\{[^}]*\}[[:space:]]*)?[Tt]he [A-Za-z_ ]+\.?$|"""[[:space:]]*[A-Z][a-z]+s? the [a-z_ ]+\.?[[:space:]]*"""$)
-type-escape	code	-	\bas any\b|\bas unknown as\b|@ts-(ignore|nocheck|expect-error)|#[[:space:]]*type:[[:space:]]*ignore|\beslint-disable|//[[:space:]]*nolint|#\[allow\(dead_code|\bunwrap\(\)|\.unwrap_or_default\(\)|\bObject\b[[:space:]]*\]|:[[:space:]]*any\b|\bAny\b\]|\binterface\{\}|@SuppressWarnings|# noqa$|# pylint: disable
-swallowed-error	code	-	except([[:space:]]+[A-Za-z_.]+([[:space:]]+as[[:space:]]+[a-z_]+)?)?:[[:space:]]*$|except[[:space:]]*:|catch[[:space:]]*(\([^)]*\))?[[:space:]]*\{[[:space:]]*\}|catch[[:space:]]*(\([^)]*\))?[[:space:]]*\{[[:space:]]*(console|log|logger)\.[a-zA-Z]+\([^;]*\);?[[:space:]]*\}|if[[:space:]]+err[[:space:]]*!=[[:space:]]*nil[[:space:]]*\{[[:space:]]*return[[:space:]]+nil|rescue[[:space:]]*(=>|$)|\.catch\(\(?\)?[[:space:]]*=>[[:space:]]*(\{[[:space:]]*\}|null|undefined)\)|contextlib\.suppress
-defensive-fallback	code	-	\?\?[[:space:]]*(\[\]|\{\}|''|""|0|null|undefined)|\|\|[[:space:]]*(\[\]|\{\})|\bhasattr\(|getattr\([^,]+,[^,]+,[[:space:]]*(None|""|\[\]|\{\})\)|\.get\([^,)]+,[[:space:]]*(\[\]|\{\}|None|0|""))|typeof[[:space:]]+[A-Za-z_.]+[[:space:]]*(!|=)==[[:space:]]*['"]undefined['"]|isinstance\([a-z_]+,[[:space:]]*\(?[a-z]+,|\bassert[[:space:]]+[a-z_]+[[:space:]]+is[[:space:]]+not[[:space:]]+None
+type-escape	code	-	\bas any\b|\bas unknown as\b|@ts-(ignore|nocheck|expect-error)|#[[:space:]]*type:[[:space:]]*ignore|\beslint-disable|//[[:space:]]*nolint|#\[allow\(dead_code|\bunwrap\(\)|\.unwrap_or_default\(\)|\bObject\b[[:space:]]*\]|:[[:space:]]*any\b|\bAny\b\]|\binterface\{\}|@SuppressWarnings|# noqa$|# pylint: disable|[A-Za-z0-9_)\]]!!|@Suppress\(|@file:Suppress\(
+swallowed-error	code	-	except([[:space:]]+[A-Za-z_.]+([[:space:]]+as[[:space:]]+[a-z_]+)?)?:[[:space:]]*$|except[[:space:]]*:|catch[[:space:]]*(\([^)]*\))?[[:space:]]*\{[[:space:]]*\}|catch[[:space:]]*(\([^)]*\))?[[:space:]]*\{[[:space:]]*(console|log|logger)\.[a-zA-Z]+\([^;]*\);?[[:space:]]*\}|if[[:space:]]+err[[:space:]]*!=[[:space:]]*nil[[:space:]]*\{[[:space:]]*return[[:space:]]+nil|rescue[[:space:]]*(=>|$)|\.catch\(\(?\)?[[:space:]]*=>[[:space:]]*(\{[[:space:]]*\}|null|undefined)\)|contextlib\.suppress|catch[[:space:]]*\([^)]*\)[[:space:]]*\{[[:space:]]*(null|false|Unit|emptyList\(\)|e\.printStackTrace\(\)|Log\.[a-z]\([^}]*\))[[:space:]]*\}|runCatching[[:space:]]*\{.*\}[[:space:]]*\.getOrNull\(\)|\.onFailure[[:space:]]*\{[[:space:]]*\}
+defensive-fallback	code	-	\?\?[[:space:]]*(\[\]|\{\}|''|""|0|null|undefined)|\|\|[[:space:]]*(\[\]|\{\})|\bhasattr\(|getattr\([^,]+,[^,]+,[[:space:]]*(None|""|\[\]|\{\})\)|\.get\([^,)]+,[[:space:]]*(\[\]|\{\}|None|0|""))|typeof[[:space:]]+[A-Za-z_.]+[[:space:]]*(!|=)==[[:space:]]*['"]undefined['"]|isinstance\([a-z_]+,[[:space:]]*\(?[a-z]+,|\bassert[[:space:]]+[a-z_]+[[:space:]]+is[[:space:]]+not[[:space:]]+None|\?:[[:space:]]*(emptyList|emptyMap|emptySet|listOf|mapOf|setOf)\(\)|\?:[[:space:]]*(\"\"|0|0L|0\.0|false)([^.0-9A-Za-z_]|$)
 placeholder	any	i	\b(TODO|FIXME|XXX|HACK)\b|NotImplementedError|\btodo!\(|unimplemented!\(|panic!\("(not|todo)|for now[,.]|in a real (implementation|app|world|system)|in production[,;] you|would (be|go) here|placeholder (for|value)|dummy (data|value|implementation)|stub(bed)? (out|for|implementation)|should (work|be fine)|hopefully|not implemented yet|coming soon|left as an exercise
 naming-inflation	code	-	\b(Enhanced|Improved|Robust|Advanced|Comprehensive|Intelligent|Smart|Ultimate|Unified|Optimized|Modernized|Simplified|Streamlined|Powerful|Flexible|Seamless)[A-Z_]|\b(enhanced|improved|robust|comprehensive|optimized|unified|advanced)_[a-z]|[A-Za-z]V2\b|_v2\b|_new\b|_old\b|_final\b|Impl2?\b|\bhandleTheEvent\b|Wrapper\b
-stdlib-reimpl	code	-	(function|const|let|var|def|func|fn|class)[[:space:]]+[A-Za-z_]*(deepClone|deep_clone|deepCopy|deepMerge|isEmpty|is_empty|groupBy|group_by|chunk|chunked|capitalize|titleCase|debounce|throttle|sleep|delay|retry|uuid|randomId|slugify|flatten|unique|dedupe|deduplicate|clamp|range|zip|omit|pick|memoize)\b
-log-noise	code	-	console\.(log|debug|info)\(|^[[:space:]]*print\(|println!\(|fmt\.Print|System\.out\.print|logger?\.(debug|info)\([^)]*(starting|finished|done|success|entering|exiting|about to|called with)
+stdlib-reimpl	code	-	(function|const|let|var|def|func|fn|fun|val|class)[[:space:]]+[A-Za-z_]*(deepClone|deep_clone|deepCopy|deepMerge|isEmpty|is_empty|groupBy|group_by|chunk|chunked|capitalize|titleCase|debounce|throttle|sleep|delay|retry|uuid|randomId|slugify|flatten|unique|dedupe|deduplicate|clamp|range|zip|omit|pick|memoize)\b
+log-noise	code	-	console\.(log|debug|info)\(|^[[:space:]]*print\(|println!\(|fmt\.Print|System\.out\.print|^[[:space:]]*println\(|\bLog\.(v|d|i)\(|\bTimber\.(v|d|i)\(|logger?\.(debug|info)\([^)]*(starting|finished|done|success|entering|exiting|about to|called with)
 emoji	any	-	(🚀|✅|❌|✨|🎉|🔥|💡|⚠️|📝|🎯|🛠|🧪|🔒|⚡|👍|🙌|📦|🔧|💪|🌟|🤖|📊|🎨|🧹|✔️|❗)
 test-theater	test	-	expect\(true\)|assert[[:space:]]+True[[:space:]]*$|assertTrue\(True\)|expect\(1\)\.toBe\(1\)|toHaveBeenCalled\(\)|assert_called_once\(\)[[:space:]]*$|\.toBeDefined\(\)|\.toBeTruthy\(\)|assert[[:space:]]+[a-z_]+[[:space:]]+is[[:space:]]+not[[:space:]]+None[[:space:]]*$|@pytest.mark.skip|\.skip\(|xit\(|it\.todo\(
 compat-shim	code	i	backwards?[- ]compat|kept for compat|legacy (support|alias|path)|@deprecated|deprecated:|for compatibility|re-?export(ed)? for
@@ -302,7 +302,7 @@ echo
 # business; running an unknown binary out of a Stop-hook-adjacent script is not this script's.
 echo "## tools present"
 FOUND=""
-for T in knip ts-prune vulture jscpd eslint ruff vale deadcode staticcheck; do
+for T in knip ts-prune vulture jscpd eslint ruff vale deadcode staticcheck detekt ktlint; do
   command -v "$T" >/dev/null 2>&1 && FOUND="$FOUND $T"
 done
 for T in knip jscpd eslint; do
@@ -312,6 +312,11 @@ if [ -n "$FOUND" ]; then
   echo "on PATH:$FOUND"
   echo "(dead code and duplication are theirs to find, not this scan's)"
 else
-  echo "none of knip / vulture / jscpd / eslint / ruff / vale found"
+  echo "none of knip / vulture / jscpd / eslint / ruff / vale / detekt found"
+fi
+# Kotlin has no knip: the compiler is what reports unused parameters and variables, as `w:`
+# lines, but only on a task that actually recompiles (Gradle skips up-to-date ones).
+if grep -q '\.kts\{0,1\}$' "$FILES" && [ -f gradlew ]; then
+  echo "kotlin: ./gradlew <module>:compile<Variant>Kotlin --rerun prints unused params and vars as w: lines"
 fi
 exit 0

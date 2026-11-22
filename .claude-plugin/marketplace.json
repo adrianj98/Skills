@@ -55,7 +55,7 @@
       "displayName": "Deslop",
       "source": "./plugins/deslop",
       "description": "Finds the AI slop in what just changed \u2014 restating comments, defensive checks on trusted values, dead abstraction, inflated prose \u2014 reports it, and on request cuts it.",
-      "version": "0.1.1",
+      "version": "0.2.0",
       "author": {
         "name": "Adrian Jones",
         "url": "https://github.com/adrianj98"
