@@ -131,12 +131,36 @@ Read .claude/strataport/<file>.md, then continue from "Next step". Run /stratapo
 
 On the receiving side (web or another machine):
 
-1. `git pull` if the branch might be behind, then read `.claude/strataport/<branch>.md`. If
-   there is none for this branch, list `.claude/strataport/` and ask which to use.
+1. Find the brief. A cloud session often starts on the default branch or a branch of its own,
+   so don't assume the brief is on the branch you're on.
+   - If `.claude/strataport/<current-branch>.md` exists, `git pull` and use it.
+   - Otherwise find the newest brief on any remote branch. Cloud clones can be shallow or
+     single-branch, so fetch every branch first:
+
+     ```bash
+     git remote set-branches origin '*'
+     git fetch --quiet origin
+     git log --remotes=origin --diff-filter=AM -1 --format='%H %cI' -- .claude/strataport/
+     ```
+
+     The brief that commit added or changed names its branch on the line that starts
+     `Branch`. Check it out (it tracks `origin/<branch>`):
+
+     ```bash
+     git switch <branch>
+     ```
+
+     Say which branch and brief you picked and how old it is.
+   - No brief anywhere: say so and stop.
+   - If more than one brief changed in the last day, list them (branch, goal line, age) and
+     ask which one, rather than guessing.
 2. Check the brief against the branch: run the test or build command it names and look at
    the files it points to. Say in a few lines what matches and what doesn't.
 3. Rebuild the plan as a todo list, then do the **Next step**.
 4. Before handing back, run the package steps above again: the brief is updated, committed and
-   pushed, and the other side runs `git pull` and `/strataport resume`.
+   pushed, and the other side runs `/strataport resume`, which finds it the same way. If the
+   push to the brief's branch is refused (some cloud sessions may only push to a branch of
+   their own), push to the branch you're allowed to and write that branch on the brief's
+   `Branch` line; resume still finds it as the newest brief.
 
 When the work is done and merged, delete the brief in the last commit; it's history now.

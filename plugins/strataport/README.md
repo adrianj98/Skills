@@ -30,10 +30,23 @@ branch first.
 |---|---|
 | `/strataport` | package this session and push |
 | `/strataport start with the tests` | same, with a note for the next session's first step |
-| `/strataport resume` | read the brief for this branch, check it against the code, carry on |
+| `/strataport resume` | find the newest brief on any branch, switch to it, check it against the code, carry on |
 
-The web side doesn't need the plugin. The pasted prompt is enough. Install it there too
-if you want `/strataport` to hand the work back.
+## In the cloud
+
+`/strataport resume` doesn't need you to pick the branch. It fetches every branch, finds
+the newest brief, switches to its branch and carries on, so a cloud session started on
+`main` works. If several briefs changed in the last day, it asks which one.
+
+A cloud session only has the skills committed in the repo it clones. To have `/strataport`
+there, install it into that repo and commit it:
+
+```bash
+cd ~/projects/your-repo && ~/projects/Skills/install.sh strataport --local
+```
+
+Without it, paste the prompt `/strataport` printed instead. That works too, but can't
+hand the work back with `/strataport`.
 
 ## Installing without the plugin system
 

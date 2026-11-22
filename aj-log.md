@@ -1,5 +1,22 @@
 # aj-log
 
+## 2026-11-22 — strataport: resume finds the newest brief on any branch (v0.2.0)
+
+- Why: the user wants to start a cloud session and have it resume the latest strataport
+  without picking the branch. Resume only read the brief for the branch it was on, and a
+  cloud session may start on `main` or on a branch of its own.
+- `SKILL.md` resume: widen the clone to every branch (`git remote set-branches origin '*'`,
+  then fetch), take the newest commit that added or changed a brief under
+  `.claude/strataport/`, read the branch from the brief's `Branch` line and `git switch` to it.
+  It asks when several briefs changed in the last day. Handing back pushes to an allowed
+  branch if the brief's branch is refused, and names that branch in the brief.
+- Tested on a scratch bare remote with two branches holding briefs and a `--single-branch`
+  clone of `main`. It picked the newer branch and tracked `origin/<branch>`. A first try with
+  `git switch -c --track` failed there ("starting point is not a branch"), which is why it
+  uses `set-branches`.
+- README "In the cloud": a cloud session only has the skills committed in the repo, so to use
+  `/strataport` there you run `install.sh strataport --local` in that repo. Version 0.2.0.
+
 ## 2026-11-22 — strataport: carry a session's plan and context to Claude Code on the web (v0.1.0)
 
 - Why: the user wants to package up the current plan and context so they can check out the
