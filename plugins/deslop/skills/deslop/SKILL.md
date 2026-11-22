@@ -64,9 +64,9 @@ against the scan's base) with these in mind:
   installed), it will find these faster than you.
 - **Dead on arrival** — exports nobody imports, params nobody reads, a flag with one branch,
   a back-compat shim for a symbol introduced in the same change. `knip`, `ts-prune` and
-  `vulture` prove this properly; in Kotlin it's the compiler's `w:` warnings on a compile
-  that actually reruns. Your own grep for the symbol is the cheap version: ignore hits in
-  comments and KDoc links, but not in string templates (`"${x}"` is a real use).
+  `vulture` prove this properly, and `detekt` for Kotlin (the Kotlin 2 compiler does not
+  warn about unused parameters or locals). Your own grep for the symbol is the cheap version:
+  ignore hits in comments and KDoc links, but not in string templates (`"${x}"` is a real use).
 - **Tests that assert the mock** — a test whose only assertion is that a function it stubbed
   was called, or that covers the same failure domain as the test above it.
 - **Restated docs** — a README section, a docstring, or a comment block that says again what

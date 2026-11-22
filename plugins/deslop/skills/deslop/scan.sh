@@ -314,9 +314,10 @@ if [ -n "$FOUND" ]; then
 else
   echo "none of knip / vulture / jscpd / eslint / ruff / vale / detekt found"
 fi
-# Kotlin has no knip: the compiler is what reports unused parameters and variables, as `w:`
-# lines, but only on a task that actually recompiles (Gradle skips up-to-date ones).
-if grep -q '\.kts\{0,1\}$' "$FILES" && [ -f gradlew ]; then
-  echo "kotlin: ./gradlew <module>:compile<Variant>Kotlin --rerun prints unused params and vars as w: lines"
+# Kotlin has no knip, and the K2 compiler (Kotlin 2.x) does not warn about unused parameters
+# or locals: a 2.4 compile of a 15k-line app reported none of the dozen that grep proved.
+# detekt does (UnusedParameter, UnusedVariable, UnusedPrivate*); otherwise grep each symbol.
+if grep -q '\.kts\{0,1\}$' "$FILES"; then
+  echo "kotlin: the compiler won't list unused params or locals; detekt's Unused* rules will, else grep each symbol"
 fi
 exit 0

@@ -9,8 +9,10 @@
   `runCatching { … }.getOrNull()`, an empty `.onFailure {}`. defensive-fallback: `?:` to an
   empty collection, `""`, `0` or `false`. log-noise: `Log.v/d/i(`, `Timber.v/d/i(`, a bare
   `println(`. stdlib-reimpl: `fun` / `val` declarations. Tools list adds `detekt`, `ktlint`;
-  with `.kt` in scope and a `gradlew`, it points at the compiler's `w:` lines for unused
-  params. SKILL.md says the same, and that a symbol grep must count string templates.
+  with `.kt` in scope it says detekt's Unused* rules find unused params and locals, because
+  the Kotlin 2 compiler doesn't: a Kotlin 2.4.21 compile of that app warned about none of the
+  unused params and locals grep had proved (first draft of this pointed at the compiler —
+  wrong). SKILL.md says the same, and that a symbol grep must count string templates.
 - Tested on that app: 1 candidate before, 32 after (the `!!`-free codebase's `@Suppress`
   idiom ×5, `runCatching{}.getOrNull()` ×4, `?: ""` ×15 …). On its TypeScript web app the
   per-category counts are identical before and after.
