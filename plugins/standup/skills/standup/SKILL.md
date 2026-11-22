@@ -7,16 +7,15 @@ allowed-tools: Bash, mcp__claude_ai_Atlassian_Rovo__searchJiraIssuesUsingJql, mc
 
 Since the start of your last working day: commits across every worktree of this repo (branch, time, sha, subject, then the message body indented), your GitHub PRs, and what the shared `$(git rev-parse --path-format=absolute --git-common-dir)/aj-log.md` and each `<worktree>/aj-log.md` gained:
 
-!`bash "${CLAUDE_PLUGIN_ROOT}/scripts/standup.sh" 2>&1`
+!`bash "${CLAUDE_SKILL_DIR}/standup.sh" 2>&1`
 
-If that line is still a command rather than its output, this host (Devin, for one) neither
-runs it nor sets `${CLAUDE_PLUGIN_ROOT}`. The plugin root is two directories above this
-skill's base directory: run `scripts/standup.sh` from there with `bash`, and use that path
-wherever `${CLAUDE_PLUGIN_ROOT}` appears below.
+If that line is still a command rather than its output, this host (Devin, for one) doesn't
+run it. `standup.sh` sits beside this file, in the skill's base directory: run it from there
+with `bash`, and use that path wherever `${CLAUDE_SKILL_DIR}/standup.sh` appears below.
 
 The user invoked this with `$ARGUMENTS`. If that asks for a different window ("since friday",
 "last 3 days") or for everyone's commits, rerun
-`bash "${CLAUDE_PLUGIN_ROOT}/scripts/standup.sh" --since "<when>"` and/or `--everyone`
+`bash "${CLAUDE_SKILL_DIR}/standup.sh" --since "<when>"` and/or `--everyone`
 and use that output instead.
 
 **Jira.** If a Jira tool is available (an Atlassian MCP server's JQL search, or a `jira` /

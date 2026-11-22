@@ -4,11 +4,11 @@
 name   Standup
 about  A very short list of what you worked on since your last working day: commits, PRs, Jira, aj-log.md.
 
-file   skills/standup/SKILL.md  skills/standup/SKILL.md    /standup
-file   scripts/standup.sh       skills/standup/standup.sh  gathers commits, PRs and aj-log.md
+file   skills/standup/SKILL.md    skills/standup/SKILL.md    /standup
+file   skills/standup/standup.sh  skills/standup/standup.sh  gathers commits, PRs and aj-log.md
 
-# Outside the plugin system there is no ${CLAUDE_PLUGIN_ROOT} and no /plugin:skill namespace.
-rewrite  ${CLAUDE_PLUGIN_ROOT}/scripts/standup.sh  @ROOT@/skills/standup/standup.sh
+# The script sits beside SKILL.md and is found through ${CLAUDE_SKILL_DIR}, so its path
+# needs no rewrite. Outside the plugin system there is no /plugin:skill namespace.
 rewrite  /standup:standup                          /standup
 
 tip  /standup                  since your last working day, your commits

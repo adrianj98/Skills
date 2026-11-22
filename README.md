@@ -315,11 +315,20 @@ Code only. `SKILLS_DEVIN_SOURCE=you/Skills` installs from a fork.
 
 Re-running is idempotent. `SKILLS_RAW=…` points the standalone install at a fork or branch.
 
+Skills alone don't need `install.sh`: copying a skill's folder
+(`plugins/<name>/skills/<skill>/`) into `~/.claude/skills/` works, because each skill keeps
+its scripts beside its `SKILL.md` and finds them through `${CLAUDE_SKILL_DIR}`. Hooks, agents,
+workflows and the `/plugin:skill` renames still need `install.sh`, and so does `/adversary`,
+whose toggle and reviewer agent live outside its skill folder.
+
 ## Adding a plugin to this repo
 
 1. `plugins/<name>/` with a `.claude-plugin/plugin.json`
 2. Auto-discovered subdirs: `skills/<name>/SKILL.md`, `agents/*.md`, `commands/*.md`,
-   `workflows/*.js`, `hooks/hooks.json`, `bin/`, `.mcp.json`
+   `workflows/*.js`, `hooks/hooks.json`, `bin/`, `.mcp.json`. A script that only a skill
+   runs goes beside its `SKILL.md` and is called as `${CLAUDE_SKILL_DIR}/x.sh`, never through
+   `${CLAUDE_PLUGIN_ROOT}`, which only the plugin system sets: a skill copied on its own then
+   still finds it.
 3. Add an entry to [`.claude-plugin/marketplace.json`](.claude-plugin/marketplace.json)
 4. `claude plugin validate .`
 5. Optional: a `plugins/<name>/install.manifest`, plus the name in

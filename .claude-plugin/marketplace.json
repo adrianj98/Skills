@@ -34,7 +34,7 @@
       "displayName": "Standup",
       "source": "./plugins/standup",
       "description": "A very short list of what you worked on since your last working day, from the commits in every worktree of the current repo, your GitHub PRs, your Jira issues and any aj-log.md.",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "author": {
         "name": "Adrian Jones",
         "url": "https://github.com/adrianj98"
@@ -55,7 +55,7 @@
       "displayName": "Deslop",
       "source": "./plugins/deslop",
       "description": "Finds the AI slop in what just changed \u2014 restating comments, defensive checks on trusted values, dead abstraction, inflated prose \u2014 reports it, and on request cuts it.",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "author": {
         "name": "Adrian Jones",
         "url": "https://github.com/adrianj98"
@@ -143,7 +143,7 @@
       "displayName": "Progress",
       "source": "./plugins/progress",
       "description": "Where a branch and its pull request stand: what it's about, then its state \u2014 review, checks, conflicts, what's unpushed, and the one thing left before it merges.",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "author": {
         "name": "Adrian Jones",
         "url": "https://github.com/adrianj98"
@@ -255,7 +255,7 @@
       "displayName": "Why Slow",
       "source": "./plugins/whyslow",
       "description": "Works out why this computer is slow: runs a read-only snapshot script, then diagnoses from the numbers and names the culprit and the fix.",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "author": {
         "name": "Adrian Jones",
         "url": "https://github.com/adrianj98"
@@ -277,7 +277,7 @@
       "displayName": "Mutants",
       "source": "./plugins/mutants",
       "description": "Mutation-tests a JS/TS module with Stryker, then deletes the zero-kill tests that are safe to drop and strengthens weak assertions until they kill the surviving mutants, proving each change with a rerun.",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "author": {
         "name": "Adrian Jones",
         "url": "https://github.com/adrianj98"

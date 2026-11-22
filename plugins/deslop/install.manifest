@@ -5,10 +5,10 @@ name   Deslop
 about  Finds the AI slop in what just changed, reports it, and on request cuts it.
 
 file   skills/deslop/SKILL.md  skills/deslop/SKILL.md  /deslop
-file   scripts/scan.sh         skills/deslop/scan.sh   the mechanical first pass
+file   skills/deslop/scan.sh   skills/deslop/scan.sh   the mechanical first pass
 
-# Outside the plugin system there is no ${CLAUDE_PLUGIN_ROOT} and no /plugin:skill namespace.
-rewrite  ${CLAUDE_PLUGIN_ROOT}/scripts/scan.sh  @ROOT@/skills/deslop/scan.sh
+# The script sits beside SKILL.md and is found through ${CLAUDE_SKILL_DIR}, so its path
+# needs no rewrite. Outside the plugin system there is no /plugin:skill namespace.
 rewrite  /deslop:deslop                          /deslop
 
 tip  /deslop              what the slop is, as a report

@@ -8,12 +8,11 @@ allowed-tools: Bash, mcp__claude_ai_Atlassian_Rovo__searchJiraIssuesUsingJql, mc
 The branch against its base, the working tree, the commits with their bodies, the PR's
 reviews, review threads, checks, mergeability and conversation, and what aj-log.md says:
 
-!`bash "${CLAUDE_PLUGIN_ROOT}/scripts/progress.sh" $ARGUMENTS 2>&1`
+!`bash "${CLAUDE_SKILL_DIR}/progress.sh" $ARGUMENTS 2>&1`
 
-If that line is still a command rather than its output, this host (Devin, for one) neither
-runs it nor sets `${CLAUDE_PLUGIN_ROOT}`. The plugin root is two directories above this
-skill's base directory: run `scripts/progress.sh` from there with `bash`, passing
-`$ARGUMENTS`, and use its output.
+If that line is still a command rather than its output, this host (Devin, for one) doesn't
+run it. `progress.sh` sits beside this file, in the skill's base directory: run it from there
+with `bash`, passing `$ARGUMENTS`, and use its output.
 
 **Jira.** If the output ends with `== issue keys` and a Jira tool is available (an Atlassian
 MCP server, or a `jira` / `acli` CLI), fetch each key's summary and status. If there is no

@@ -1,5 +1,29 @@
 # aj-log
 
+## 2026-11-22 — skills carry their own scripts, so copying a skill folder works (v0.1.1 ×5)
+
+- Why: a cloud environment's setup script installs these skills with
+  `cp -R plugins/*/skills/* ~/.claude/skills/`. That copies `SKILL.md` but not the script it
+  runs, and `${CLAUDE_PLUGIN_ROOT}` is only set by the plugin system, so `/deslop` failed on
+  `bash: /scripts/scan.sh: No such file or directory`. `/mutants`, `/progress`, `/standup`
+  and `/whyslow` were broken the same way.
+- Each of those five scripts moved from `plugins/<p>/scripts/` to beside its `SKILL.md`
+  (`skills/<p>/`), and the skill calls it as `${CLAUDE_SKILL_DIR}/<script>`. Claude Code
+  substitutes `${CLAUDE_SKILL_DIR}` in user and plugin skills alike (code.claude.com/docs/en/skills).
+  The `install.manifest` files copy from the new path and drop their `${CLAUDE_PLUGIN_ROOT}`
+  rewrite. The Devin fallback paragraphs now say the script is in the skill's base directory.
+  READMEs point at the new paths. Versions 0.1.0 → 0.1.1 in plugin.json and marketplace.json.
+- Root README: copying a skill folder on its own works; a script that only a skill runs goes
+  beside its `SKILL.md`. `/adversary` is unchanged: its toggle is shared with its hooks and it
+  needs the reviewer agent, so it still needs `install.sh` (its status line falls back to
+  "state: unknown" rather than failing).
+- Tested: a throwaway skill with `!`echo ${CLAUDE_SKILL_DIR}`` printed its own folder in a
+  live session. Bare `cp` and `install.sh all --global --no-hook` into scratch homes both put
+  every script beside its skill; `--uninstall` removed the five. Each moved script runs from
+  its new place. `claude plugin validate` passes for the marketplace and the five plugins.
+  (`install.sh all` still exits 1 here because the `superpowers` tarball download got a 403;
+  unrelated.)
+
 ## 2026-11-22 — strataport: resume finds the newest brief on any branch (v0.2.0)
 
 - Why: the user wants to start a cloud session and have it resume the latest strataport
