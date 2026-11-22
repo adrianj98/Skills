@@ -286,6 +286,28 @@
       "license": "MIT",
       "keywords": ["testing", "mutation-testing", "stryker", "test-quality"],
       "category": "development"
+    },
+    {
+      "name": "strataport",
+      "displayName": "Strataport",
+      "source": "./plugins/strataport",
+      "description": "Packs the plan and context of this session into a brief on the branch, commits the work in progress and pushes, so you can open the same branch in Claude Code on the web and carry on.",
+      "version": "0.1.0",
+      "author": {
+        "name": "Adrian Jones",
+        "url": "https://github.com/adrianj98"
+      },
+      "repository": "https://github.com/adrianj98/skills",
+      "license": "MIT",
+      "keywords": [
+        "handoff",
+        "web",
+        "context",
+        "plan",
+        "branch",
+        "resume"
+      ],
+      "category": "productivity"
     }
   ]
 }

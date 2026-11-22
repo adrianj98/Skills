@@ -1,5 +1,21 @@
 # aj-log
 
+## 2026-11-22 — strataport: carry a session's plan and context to Claude Code on the web (v0.1.0)
+
+- Why: the user wants to package up the current plan and context so they can check out the
+  same branch online (claude.ai/code) and continue. A web session gets only the repo at the
+  branch, so the context has to travel as a file on that branch.
+- New plugin `plugins/strataport`. `skills/strataport/SKILL.md` writes a brief to
+  `.claude/strataport/<branch>.md`. The brief covers the goal, the plan with each step's
+  state, decisions, what was ruled out, files and commands, what isn't on the branch (env var
+  names only), open questions and the next step. The skill then commits the WIP with it,
+  pushes, checks that the remote hash matches, and prints the prompt to paste on the web.
+  It creates a branch when on the default branch, unstages secret-looking files, and never
+  skips hooks without asking. `/strataport resume` reads the brief, checks it against the
+  code and carries on.
+- `plugin.json`, `install.manifest`, README; registered in `marketplace.json`, `plugins/index`
+  and the repo README. A local install into a scratch dir copied the skill correctly.
+
 ## 2026-11-12 — work-band: a chosen port is remembered per worktree (v0.2.4)
 
 - Why: every worktree of `alertd-core.git` started on 1999 instead of a random port from the

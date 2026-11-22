@@ -151,6 +151,20 @@ claude plugin install mutants@adrianj98-skills
 
 [Full README →](plugins/mutants/README.md)
 
+### [`strataport`](plugins/strataport) · v0.1.0
+
+`/strataport` — take this session to Claude Code on the web. It writes the goal, the plan with
+each step's state, the decisions, what was ruled out, the files that matter, what isn't on the
+branch and the next step into `.claude/strataport/<branch>.md`. It commits the work in progress
+with it, pushes, and prints the prompt to paste into claude.ai/code on that branch.
+`/strataport resume` picks up from the brief, on either side.
+
+```bash
+claude plugin install strataport@adrianj98-skills
+```
+
+[Full README →](plugins/strataport/README.md)
+
 ### [`caveman`](plugins/caveman) · v0.1.0
 
 `/caveman` — short, plain replies for the rest of the session, with no pleasantries, hedging

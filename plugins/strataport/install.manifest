@@ -1,0 +1,14 @@
+# What ../../install.sh copies when someone installs this plugin without the plugin system.
+# Verbs are documented in ../adversarial-review/install.manifest.
+
+name   Strataport
+about  Packs the plan and context into a brief on the branch and pushes it, to carry on in Claude Code on the web.
+
+file   skills/strataport/SKILL.md  skills/strataport/SKILL.md  /strataport
+
+# Outside the plugin system there is no /plugin:skill namespace.
+rewrite  /strataport:strataport  /strataport
+
+tip  /strataport                       package this session and push
+tip  /strataport start with the tests  same, with a note for the next session
+tip  /strataport resume                pick up from the brief on this branch
