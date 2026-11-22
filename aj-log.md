@@ -1,5 +1,17 @@
 # aj-log
 
+## 2026-11-22 — deslop: an unwired feature is not dead code (v0.2.1)
+
+- Why: the user said not to remove features that aren't wired up. A deslop of an Android app
+  had listed as dead code things like a session's `busy` flag that nothing disables a button
+  on, and the shared layer held whole built features with no caller (an RV-routing status
+  line, an AI write-up the backend still generates, search filters the AI extracts).
+- `SKILL.md` section 3 (never slop) gains "a feature that isn't wired up yet". It covers an
+  endpoint and its client, shared logic, a session field or method, a type, or backend data
+  that no screen reaches, plus state that exists to drive the UI but isn't read. These are
+  told from leftovers by what they would do for the user and by docs, specs and history.
+  They're reported in their own "Unwired features" list. Section 6: `run` never cuts one.
+
 ## 2026-11-22 — deslop: the scan knows Kotlin (v0.2.0)
 
 - Why: run over a native Android app (15k lines of Kotlin), the scan flagged one line. Its rows
