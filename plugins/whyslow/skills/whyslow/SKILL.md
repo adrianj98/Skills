@@ -11,10 +11,10 @@ The user said: `$ARGUMENTS` (may be empty).
 
 Run the snapshot. It is read-only and takes about 12 seconds (two CPU samples, one disk sample):
 
-!`bash "${CLAUDE_PLUGIN_ROOT}/scripts/snapshot.sh" 5 2>&1`
+!`bash "${CLAUDE_SKILL_DIR}/snapshot.sh" 5 2>&1`
 
-If that line is still a command rather than its output, this host didn't run it. The plugin
-root is two directories above this skill's base directory: run `scripts/snapshot.sh 5` from
+If that line is still a command rather than its output, this host didn't run it.
+`snapshot.sh` sits beside this file, in the skill's base directory: run `snapshot.sh 5` from
 there with `bash` and use its output.
 
 Don't diagnose from memory or from what is "usually" wrong. Every claim in the report comes

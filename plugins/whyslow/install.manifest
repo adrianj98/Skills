@@ -4,11 +4,11 @@
 name   Why Slow
 about  Why this computer is slow: a read-only snapshot script, then a diagnosis that names the culprit and the fix.
 
-file   skills/whyslow/SKILL.md  skills/whyslow/SKILL.md     /whyslow
-file   scripts/snapshot.sh      skills/whyslow/snapshot.sh  read-only snapshot of CPU, memory, disk, thermal and processes
+file   skills/whyslow/SKILL.md     skills/whyslow/SKILL.md     /whyslow
+file   skills/whyslow/snapshot.sh  skills/whyslow/snapshot.sh  read-only snapshot of CPU, memory, disk, thermal and processes
 
-# Outside the plugin system there is no ${CLAUDE_PLUGIN_ROOT} and no /plugin:skill namespace.
-rewrite  ${CLAUDE_PLUGIN_ROOT}/scripts/snapshot.sh  @ROOT@/skills/whyslow/snapshot.sh
+# The script sits beside SKILL.md and is found through ${CLAUDE_SKILL_DIR}, so its path
+# needs no rewrite. Outside the plugin system there is no /plugin:skill namespace.
 rewrite  /whyslow:whyslow                           /whyslow
 
 tip  /whyslow                  diagnose from the snapshot alone

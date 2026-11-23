@@ -1,7 +1,7 @@
 {
   "name": "mutants",
   "displayName": "Mutants",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Mutation-tests a JS/TS module with Stryker, then deletes the zero-kill tests that are safe to drop and strengthens weak assertions until they kill the surviving mutants, proving each change with a rerun.",
   "author": { "name": "Adrian Jones", "url": "https://github.com/adrianj98" },
   "repository": "https://github.com/adrianj98/skills",

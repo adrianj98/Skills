@@ -7,11 +7,11 @@ allowed-tools: Bash, Read, Grep, Glob, Edit, Write
 
 Mechanical scan of what changed, already run:
 
-!`bash "${CLAUDE_PLUGIN_ROOT}/scripts/scan.sh" 2>&1`
+!`bash "${CLAUDE_SKILL_DIR}/scan.sh" 2>&1`
 
-If that line is still a command rather than its output, this host (Devin, for one) neither
-runs it nor sets `${CLAUDE_PLUGIN_ROOT}`. The plugin root is two directories above this
-skill's base directory: run `scripts/scan.sh` from there with `bash`.
+If that line is still a command rather than its output, this host (Devin, for one) doesn't
+run it. `scan.sh` sits beside this file, in the skill's base directory: run it from there
+with `bash`.
 
 The user invoked this with `$ARGUMENTS`.
 
@@ -64,7 +64,9 @@ against the scan's base) with these in mind:
   installed), it will find these faster than you.
 - **Dead on arrival** — exports nobody imports, params nobody reads, a flag with one branch,
   a back-compat shim for a symbol introduced in the same change. `knip`, `ts-prune` and
-  `vulture` prove this properly; your own grep for the symbol is the cheap version.
+  `vulture` prove this properly, and `detekt` for Kotlin (the Kotlin 2 compiler does not
+  warn about unused parameters or locals). Your own grep for the symbol is the cheap version:
+  ignore hits in comments and KDoc links, but not in string templates (`"${x}"` is a real use).
 - **Tests that assert the mock** — a test whose only assertion is that a function it stubbed
   was called, or that covers the same failure domain as the test above it.
 - **Restated docs** — a README section, a docstring, or a comment block that says again what
@@ -84,6 +86,16 @@ Protected by default. Cutting one of these is a bug, not a cleanup:
   explaining why a lock is taken in this order is the best line in the file.
 - Licence headers, generated files, vendored code, fixtures that are duplicated on purpose.
 - Error handling whose absence would lose data or corrupt state.
+- **A feature that isn't wired up yet.** Code with no caller is not dead when it does
+  something a user would see: an endpoint and its client call, shared logic, a session
+  field or method, a type, or data the backend already produces, that no screen reaches.
+  Neither is state that is written but never read when it exists to drive the UI (a `busy`
+  flag nothing disables a button on). That is unfinished work, and the fix is to wire it.
+  Tell it from a leftover by asking what it would do for the user, then checking the docs,
+  specs and history: a doc promising it, or an old caller a rewrite dropped, settles it.
+  Only code whose job the program now does another way, or that the docs say was retired,
+  is a leftover. Report these in their own **Unwired features** list, with what each would
+  do and where it would surface, never in the findings to cut.
 
 When a candidate is one of these, say so in the "kept" section rather than silently dropping
 it. That list is what makes the rest of the report believable.
@@ -125,7 +137,8 @@ Report first, then apply. Only these get applied without asking:
 
 - `noise`, at any confidence — comments, banners, emoji, dead log lines, prose rewrites.
 - `maintenance` at `high` confidence — dead code a tool proved unreachable, an unused param,
-  a single-call wrapper you inlined.
+  a single-call wrapper you inlined. Never an unwired feature (section 3): no caller is not
+  proof it is unwanted.
 
 Everything `behavioral`, and anything at `low` confidence, is **reported as a suggestion and
 left alone**. Removing a defensive check is a behavior change even when the check is useless,

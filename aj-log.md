@@ -1,5 +1,58 @@
 # aj-log
 
+## 2026-11-22 — deslop: an unwired feature is not dead code (v0.2.1)
+
+- Why: the user said not to remove features that aren't wired up. A deslop of an Android app
+  had listed as dead code things like a session's `busy` flag that nothing disables a button
+  on, and the shared layer held whole built features with no caller (an RV-routing status
+  line, an AI write-up the backend still generates, search filters the AI extracts).
+- `SKILL.md` section 3 (never slop) gains "a feature that isn't wired up yet". It covers an
+  endpoint and its client, shared logic, a session field or method, a type, or backend data
+  that no screen reaches, plus state that exists to drive the UI but isn't read. These are
+  told from leftovers by what they would do for the user and by docs, specs and history.
+  They're reported in their own "Unwired features" list. Section 6: `run` never cuts one.
+
+## 2026-11-22 — deslop: the scan knows Kotlin (v0.2.0)
+
+- Why: run over a native Android app (15k lines of Kotlin), the scan flagged one line. Its rows
+  matched TypeScript, Python, Go, Rust, Java and Ruby forms and only the generic ones fired.
+- `scan.sh` rows gained Kotlin forms. type-escape: postfix `!!` (JS's `!!` is prefix, so it
+  can't fire there), `@Suppress(`. swallowed-error: `catch (e: X) { null }` and kin,
+  `runCatching { … }.getOrNull()`, an empty `.onFailure {}`. defensive-fallback: `?:` to an
+  empty collection, `""`, `0` or `false`. log-noise: `Log.v/d/i(`, `Timber.v/d/i(`, a bare
+  `println(`. stdlib-reimpl: `fun` / `val` declarations. Tools list adds `detekt`, `ktlint`;
+  with `.kt` in scope it says detekt's Unused* rules find unused params and locals, because
+  the Kotlin 2 compiler doesn't: a Kotlin 2.4.21 compile of that app warned about none of the
+  unused params and locals grep had proved (first draft of this pointed at the compiler —
+  wrong). SKILL.md says the same, and that a symbol grep must count string templates.
+- Tested on that app: 1 candidate before, 32 after (the `!!`-free codebase's `@Suppress`
+  idiom ×5, `runCatching{}.getOrNull()` ×4, `?: ""` ×15 …). On its TypeScript web app the
+  per-category counts are identical before and after.
+
+## 2026-11-22 — skills carry their own scripts, so copying a skill folder works (v0.1.1 ×5)
+
+- Why: a cloud environment's setup script installs these skills with
+  `cp -R plugins/*/skills/* ~/.claude/skills/`. That copies `SKILL.md` but not the script it
+  runs, and `${CLAUDE_PLUGIN_ROOT}` is only set by the plugin system, so `/deslop` failed on
+  `bash: /scripts/scan.sh: No such file or directory`. `/mutants`, `/progress`, `/standup`
+  and `/whyslow` were broken the same way.
+- Each of those five scripts moved from `plugins/<p>/scripts/` to beside its `SKILL.md`
+  (`skills/<p>/`), and the skill calls it as `${CLAUDE_SKILL_DIR}/<script>`. Claude Code
+  substitutes `${CLAUDE_SKILL_DIR}` in user and plugin skills alike (code.claude.com/docs/en/skills).
+  The `install.manifest` files copy from the new path and drop their `${CLAUDE_PLUGIN_ROOT}`
+  rewrite. The Devin fallback paragraphs now say the script is in the skill's base directory.
+  READMEs point at the new paths. Versions 0.1.0 → 0.1.1 in plugin.json and marketplace.json.
+- Root README: copying a skill folder on its own works; a script that only a skill runs goes
+  beside its `SKILL.md`. `/adversary` is unchanged: its toggle is shared with its hooks and it
+  needs the reviewer agent, so it still needs `install.sh` (its status line falls back to
+  "state: unknown" rather than failing).
+- Tested: a throwaway skill with `!`echo ${CLAUDE_SKILL_DIR}`` printed its own folder in a
+  live session. Bare `cp` and `install.sh all --global --no-hook` into scratch homes both put
+  every script beside its skill; `--uninstall` removed the five. Each moved script runs from
+  its new place. `claude plugin validate` passes for the marketplace and the five plugins.
+  (`install.sh all` still exits 1 here because the `superpowers` tarball download got a 403;
+  unrelated.)
+
 ## 2026-11-22 — strataport: resume finds the newest brief on any branch (v0.2.0)
 
 - Why: the user wants to start a cloud session and have it resume the latest strataport

@@ -17,7 +17,7 @@ and together they are how a codebase stops sounding like anyone.
 
 Two halves, because the two halves are good at different things.
 
-**The scan** (`scripts/scan.sh`) is deterministic and deliberately over-eager. It walks the
+**The scan** (`skills/deslop/scan.sh`) is deterministic and deliberately over-eager. It walks the
 lines *added* since your branch left its base — working tree and untracked files included,
 since a file nobody has `git add`ed yet is exactly what an assistant leaves behind — and
 matches ~17 pattern families across code and prose: restating comments, section banners,
@@ -78,11 +78,11 @@ The scan skips lockfiles, builds, vendored trees, generated code and binaries, a
 `.gitignore`. `DESLOP_MAX` and `DESLOP_MAX_TOTAL` cap how much of a large result gets listed
 rather than counted.
 
-`scripts/scan.sh` runs standalone, too, if you'd rather read the raw candidates yourself:
+`skills/deslop/scan.sh` runs standalone, too, if you'd rather read the raw candidates yourself:
 
 ```bash
-bash scripts/scan.sh --base origin/main
-bash scripts/scan.sh --all
+bash skills/deslop/scan.sh --base origin/main
+bash skills/deslop/scan.sh --all
 ```
 
 ## Installing without the plugin system

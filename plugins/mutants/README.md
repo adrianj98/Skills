@@ -5,7 +5,7 @@ that don't. It changes tests only, never the source.
 
 1. It runs Stryker one module at a time with per-test coverage. Stryker injects small bugs
    ("mutants") into the source and checks that some test fails.
-2. `scripts/summarize.py` turns Stryker's JSON report into the surviving mutants and the
+2. `skills/mutants/summarize.py` turns Stryker's JSON report into the surviving mutants and the
    zero-kill tests (tests that covered mutants and killed none).
 3. It deletes zero-kill tests only when everything they exercise was mutated, they check
    nothing mutation can't reach, and another test covers the same behaviour.

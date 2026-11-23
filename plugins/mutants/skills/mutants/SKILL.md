@@ -48,11 +48,10 @@ npx stryker run --mutate '<path/to/module.ts>' --testRunner vitest \
 Then summarize the report:
 
 ```bash
-python3 "${CLAUDE_PLUGIN_ROOT}/scripts/summarize.py" reports/mutation/<module>.json
+python3 "${CLAUDE_SKILL_DIR}/summarize.py" reports/mutation/<module>.json
 ```
 
-If `${CLAUDE_PLUGIN_ROOT}` is unset (installed without the plugin system), the plugin root is
-two directories above this skill's base directory.
+If `${CLAUDE_SKILL_DIR}` is not filled in, `summarize.py` is in this skill's base directory.
 
 The summary gives the module's score, each `Survived` or `NoCoverage` mutant with its line,
 mutator, replacement and the tests that covered it, and the zero-kill tests: tests that ran

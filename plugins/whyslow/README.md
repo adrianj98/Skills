@@ -6,7 +6,7 @@
 claude plugin install whyslow@adrianj98-skills
 ```
 
-It runs `scripts/snapshot.sh` first: a read-only, ~12 second snapshot of CPU (sampled, not
+It runs `skills/whyslow/snapshot.sh` first: a read-only, ~12 second snapshot of CPU (sampled, not
 instantaneous), memory pressure, swap and the compressor, process memory grouped by name,
 disk space and I/O, thermal and power state, known background hogs (Spotlight, Time Machine,
 iCloud, VMs, security agents), process pile-ups, launch agents and recent hang reports.
@@ -25,4 +25,4 @@ fine. It never kills, quits or changes anything.
 | `/whyslow` | diagnose from the snapshot alone |
 | `/whyslow typing lags` | weight the diagnosis toward what feels slow |
 
-Run the script on its own with `bash plugins/whyslow/scripts/snapshot.sh [seconds]`.
+Run the script on its own with `bash plugins/whyslow/skills/whyslow/snapshot.sh [seconds]`.
