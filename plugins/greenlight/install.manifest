@@ -2,8 +2,8 @@
 # Verbs are documented in ../adversarial-review/install.manifest.
 
 name   Greenlight
-about  Merges the default branch into the current branch, pushes, and reruns the required integration check when the PR skipped it.
+about  Merges the default branch in, pushes, starts every required check that did not run, and fixes the code until all required checks pass on the final commit.
 
 file   skills/greenlight/SKILL.md  skills/greenlight/SKILL.md       /greenlight
 
-tip  /greenlight   merge the default branch in, push, make sure integration runs
+tip  /greenlight   merge the default branch in, push, run every required check until all pass

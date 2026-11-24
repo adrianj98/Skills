@@ -1,5 +1,22 @@
 # aj-log
 
+## 2026-11-24 — greenlight: run every required check and only greenlight when all pass (v0.7.0)
+
+- Why: the user asked that greenlight run all required CI and make sure everything passes. It
+  took the required list from `gh pr checks --required`, which only lists required checks that
+  have reported. On alertd-core PR #3480 that showed only `vitest`, while the repository ruleset
+  also requires `integration / integration` and `playwright / playwright`. Those two don't
+  appear until the merge gate starts, so the skill could call a PR green when they had never run.
+- `SKILL.md`: reads required checks from the rules API plus branch protection (a 404 when the
+  branch has no protection is dropped). A `verdict <sha>` helper gives each required check's
+  latest conclusion on that exact sha, `MISSING` when nothing reported. Step 4 starts any missing
+  or skipped required check, not only the gate. Step 5 waits until every required check has
+  completed on the sha, because `gh pr checks --watch` can return before rerun checks appear.
+  Step 6 fixes every failing check, required or not. The report starts with Greenlit or
+  Not greenlit.
+- Tested both snippets in alertd-core: PR #3480 head gave MISSING/MISSING/in_progress; merged
+  PRs #3468 and #3465 gave success for all three.
+- README, plugin README, plugin.json, install.manifest, marketplace.json: description and v0.7.0.
 ## 2026-11-22 — deslop: an unwired feature is not dead code (v0.2.1)
 
 - Why: the user said not to remove features that aren't wired up. A deslop of an Android app
